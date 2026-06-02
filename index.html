@@ -234,7 +234,7 @@ tbody tr:last-child{border-bottom:none}
     <div style="font-size:36px;margin-bottom:10px">🔐</div>
     <div style="font-size:17px;font-weight:600;margin-bottom:6px;color:#1E293B">Acceso de edición</div>
     <div style="font-size:13px;color:#94A3B8;margin-bottom:18px">Ingresa el PIN para modificar la programación</div>
-    <input id="pinInput" type="password" maxlength="20" placeholder="••••••" onkeydown="if(event.key==='Enter')verifyPin()"
+    <input id="pinInput" type="password" maxlength="6" placeholder="••••••" onkeydown="if(event.key==='Enter')verifyPin()"
       style="width:100%;padding:12px;font-size:20px;text-align:center;border:2px solid #CBD5E1;border-radius:10px;font-family:'DM Mono',monospace;letter-spacing:.3em;margin-bottom:14px;outline:none">
     <div id="pinError" style="color:#991B1B;font-size:12px;margin-bottom:10px;min-height:16px"></div>
     <div style="display:flex;gap:8px">
@@ -414,7 +414,7 @@ tbody tr:last-child{border-bottom:none}
 <script>
 // ── CONSTANTES ────────────────────────────────────────────────────────────────
 const GAS_URL = 'https://script.google.com/macros/s/AKfycbwyQdQl-QuUcek0m7_8BvGAPU9kyIqkwxuaFLvh3K--u8xUGLqlXA-ev78sbyBixuK3NA/exec';
-const PIN_CORRECTO = 'QXCMG1';
+const PIN_CORRECTO = '1234';
 const QXS = ['Quirófano 1','Quirófano 2','Quirófano 3'];
 const ESTADOS = ['Pendiente','En curso','Completada','Cancelada'];
 const SH = 32;
@@ -435,7 +435,11 @@ function hideLoader(){ const el=document.getElementById('loaderBar'); if(el) el.
 
 async function apiCall(payload){
   try{
-    const r = await fetch(GAS_URL, {method:'POST', mode:'cors', headers:{'Content-Type':'text/plain'}, body:JSON.stringify(payload)});
+    const params = new URLSearchParams();
+    params.append('action', payload.action);
+    if(payload.record) params.append('record', JSON.stringify(payload.record));
+    if(payload.id !== undefined) params.append('id', payload.id);
+    const r = await fetch(GAS_URL + '?' + params.toString());
     return await r.json();
   } catch(e){ console.error(e); return {ok:false}; }
 }
@@ -443,7 +447,7 @@ async function apiCall(payload){
 async function cargarDatos(){
   showLoader('🔄 Sincronizando con Google Sheets…');
   try{
-    const r = await fetch(GAS_URL+'?action=getAll');
+    const r = await fetch(GAS_URL + '?action=getAll');
     const data = await r.json();
     DB = Array.isArray(data) ? data : [];
     nid = DB.length ? Math.max(...DB.map(x=>Number(x.id)||0))+1 : 1;
