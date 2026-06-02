@@ -456,9 +456,23 @@ async function cargarDatos(){
     nid = DB.length ? Math.max(...DB.map(x=>Number(x.id)||0))+1 : 1;
     diaDB={};
     DB.forEach(r=>{
-      // Normalizar fecha — quitar hora si viene como ISO string
+      // Normalizar fecha
       if(r.fecha) r.fecha = r.fecha.toString().split('T')[0];
       if(r._fecha) r._fecha = r._fecha.toString().split('T')[0];
+      // Normalizar hora — si viene como Date ISO, extraer HH:mm
+      function fixHora(h){
+        if(!h) return '';
+        const s = h.toString();
+        if(s.includes('T')) {
+          // Es un ISO date — extraer hora UTC+0 y ajustar
+          const d = new Date(s);
+          const mins = d.getUTCHours()*60 + d.getUTCMinutes();
+          return String(Math.floor(mins/60)).padStart(2,'0')+':'+String(mins%60).padStart(2,'0');
+        }
+        return s;
+      }
+      r.hora = fixHora(r.hora);
+      r.horaReal = fixHora(r.horaReal);
       const f=r.fecha||r._fecha;
       if(f){if(!diaDB[f])diaDB[f]=[];diaDB[f].push(r);}
     });
