@@ -414,7 +414,7 @@ tbody tr:last-child{border-bottom:none}
 <script>
 // ── CONSTANTES ────────────────────────────────────────────────────────────────
 const GAS_URL = 'https://script.google.com/macros/s/AKfycbwyQdQl-QuUcek0m7_8BvGAPU9kyIqkwxuaFLvh3K--u8xUGLqlXA-ev78sbyBixuK3NA/exec';
-const PIN_CORRECTO = 'QXCMG1';
+const PIN_CORRECTO = '1234';
 const QXS = ['Quirófano 1','Quirófano 2','Quirófano 3'];
 const ESTADOS = ['Pendiente','En curso','Completada','Cancelada'];
 const SH = 32;
@@ -425,7 +425,10 @@ let nid = 1;
 let pinDesbloqueado = false;
 let pinCallback = null;
 let cur = new Date(); cur.setHours(0,0,0,0);
-function dk(d){return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')}
+function dk(d){
+  if(typeof d === 'string') d = new Date(d+'T12:00:00');
+  return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+}
 function gS(){ return diaDB[dk(cur)]||[] }
 function sS(a){ diaDB[dk(cur)]=a; }
 
@@ -452,7 +455,13 @@ async function cargarDatos(){
     DB = Array.isArray(data) ? data : [];
     nid = DB.length ? Math.max(...DB.map(x=>Number(x.id)||0))+1 : 1;
     diaDB={};
-    DB.forEach(r=>{ const f=r.fecha||r._fecha; if(f){if(!diaDB[f])diaDB[f]=[];diaDB[f].push(r);} });
+    DB.forEach(r=>{
+      // Normalizar fecha — quitar hora si viene como ISO string
+      if(r.fecha) r.fecha = r.fecha.toString().split('T')[0];
+      if(r._fecha) r._fecha = r._fecha.toString().split('T')[0];
+      const f=r.fecha||r._fecha;
+      if(f){if(!diaDB[f])diaDB[f]=[];diaDB[f].push(r);}
+    });
   } catch(e){ console.error(e); }
   hideLoader();
   render();
