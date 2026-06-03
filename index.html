@@ -364,7 +364,8 @@ style="background:var(--gris1);color:var(--gris5);cursor:default">
 </div>
 </div>
 <div class="stats-grid-4" id="stats-grid"></div>
-<div class="ind-grid" id="ind-grid"></div>
+<!-- 5 indicadores en grid -->
+<div id="ind-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:12px"></div>
 </div>
 
 <!-- MODAL -->
@@ -987,6 +988,8 @@ function exportarCSV(){
 function renderConcentrado(){
   const mes=parseInt(document.getElementById('con-mes').value);
   const anio=parseInt(document.getElementById('con-anio').value);
+
+  // Recolectar todos los registros del mes
   const allRecs=[];
   Object.entries(diaDB).forEach(([fecha,arr])=>{
     const d=new Date(fecha+'T12:00');
@@ -998,62 +1001,131 @@ function renderConcentrado(){
     const d=new Date(fd+'T12:00');
     if(d.getFullYear()===anio&&d.getMonth()===mes&&!allRecs.find(x=>x.id===r.id)) allRecs.push(r);
   });
-  const realizadas=allRecs.filter(r=>{const e=(r.estado||'').toLowerCase();return e==='completada'||e==='realizada'});
-  const canceladas=allRecs.filter(r=>{const e=(r.estado||'').toLowerCase();return e==='cancelada'});
-  const programadas=allRecs.length;
 
-  // Usar duración real cuando disponible, estimada en caso contrario
-  const totalMin=realizadas.reduce((s,r)=>s+(r.duracionReal||r.duracion||0),0);
-  const pctUtil=realizadas.length?Math.round(totalMin/(1440*3)*100*10)/10:0;
+  const programadas = allRecs.length;
+  const realizadas  = allRecs.filter(r=>{const e=(r.estado||'').toLowerCase();return e==='completada'||e==='realizada';});
+  const canceladas  = allRecs.filter(r=>(r.estado||'').toLowerCase()==='cancelada');
 
-  const conHR=realizadas.filter(r=>r.hora&&r.horaReal);
-  const puntuales=conHR.filter(r=>r.horaReal<=r.hora).length;
-  const pctPunt=conHR.length?Math.round(puntuales/conHR.length*100):null;
-  const retrasos=conHR.map(r=>{
-    const[hP,mP]=r.hora.split(':').map(Number);
-    const[hR,mR]=r.horaReal.split(':').map(Number);
-    return(hR*60+mR)-(hP*60+mP);
-  }).filter(d=>d>0);
-  const promRet=retrasos.length?Math.round(retrasos.reduce((a,b)=>a+b,0)/retrasos.length):0;
-  const pctCancel=programadas?Math.round(canceladas.length/programadas*100*10)/10:0;
-  const expMes=[...new Set(realizadas.map(r=>r.expediente).filter(Boolean))];
-  const reinCount=expMes.filter(exp=>{
-    const todos=[...allRecs,...DB].filter(r=>r.expediente===exp&&((r.estado||'').toLowerCase().includes('complet')||(r.estado||'').toLowerCase().includes('realizad')));
-    return todos.length>1;
-  }).length;
-  const pctRein=realizadas.length?Math.round(reinCount/realizadas.length*100*10)/10:0;
+  // Días únicos del mes con al menos una cirugía
+  const diasUnicos = [...new Set(allRecs.map(r=>r.fecha||r._fecha).filter(Boolean))];
+  const numDias    = diasUnicos.length || 1;
 
+  // ─── 1. UTILIZACIÓN DE QUIRÓFANO ─────────────────────────────────────────
+  // (horas utilizadas / horas disponibles) × 100
+  // Horas disponibles = 24h × 3 quirófanos × días con actividad del mes
+  const totalMinUsados = realizadas.reduce((s,r)=>s+(r.duracionReal||r.duracion||0),0);
+  const minDisponibles = 24*60 * 3 * numDias;
+  const pctUtil = minDisponibles ? Math.round(totalMinUsados/minDisponibles*1000)/10 : 0;
+
+  // ─── 2. INICIO PUNTUAL ────────────────────────────────────────────────────
+  // (cirugías iniciadas en horario / total programadas) × 100
+  // "En horario" = horaReal <= horaProgramada
+  const conHoraReal = allRecs.filter(r=>r.hora&&r.horaReal);
+  const puntuales   = conHoraReal.filter(r=>pH(r.horaReal)<=pH(r.hora)).length;
+  const pctPuntual  = conHoraReal.length ? Math.round(puntuales/conHoraReal.length*1000)/10 : null;
+  const retrasos    = conHoraReal.map(r=>Math.max(0,pH(r.horaReal)-pH(r.hora))).filter(d=>d>0);
+  const promRet     = retrasos.length ? Math.round(retrasos.reduce((a,b)=>a+b,0)/retrasos.length) : 0;
+
+  // ─── 3. CANCELACIÓN QUIRÚRGICA ────────────────────────────────────────────
+  // (canceladas / programadas) × 100
+  const pctCancel = programadas ? Math.round(canceladas.length/programadas*1000)/10 : 0;
+
+  // ─── 4. TIEMPO DE ROTACIÓN DE SALA ───────────────────────────────────────
+  // Promedio de (inicio_sig - fin_ant - 40 min limpieza)
+  // Solo pares consecutivos en el mismo quirófano y mismo día con hora fin registrada
+  const LIMPIEZA = 40;
+  const rotaciones = [];
+  // Agrupar por sala y día
+  const porSalaDia = {};
+  realizadas.forEach(r=>{
+    if(!r.horaFin) return;
+    const key=(r.qx||r.sala||'')+'|'+(r.fecha||r._fecha||'');
+    if(!porSalaDia[key]) porSalaDia[key]=[];
+    porSalaDia[key].push(r);
+  });
+  Object.values(porSalaDia).forEach(grupo=>{
+    // Ordenar por hora de inicio
+    grupo.sort((a,b)=>pH(a.hora)-pH(b.hora));
+    for(let i=0;i<grupo.length-1;i++){
+      const finAnt  = pH(grupo[i].horaFin);
+      const iniSig  = pH(grupo[i+1].horaReal||grupo[i+1].hora);
+      const rot     = iniSig - finAnt - LIMPIEZA;
+      if(rot>=0) rotaciones.push(rot);
+    }
+  });
+  const promRot = rotaciones.length ? Math.round(rotaciones.reduce((a,b)=>a+b,0)/rotaciones.length) : null;
+
+  // ─── 5. REINTERVENCIONES ─────────────────────────────────────────────────
+  // (reintervenciones / total cirugías) × 100
+  // Expediente que aparece más de una vez en todo el historial
+  const expMes = [...new Set(allRecs.map(r=>r.expediente).filter(Boolean))];
+  const reinCount = expMes.filter(exp=>DB.filter(r=>r.expediente===exp).length>1).length;
+  const pctRein = programadas ? Math.round(reinCount/programadas*1000)/10 : 0;
+
+  // ─── TARJETAS RESUMEN ─────────────────────────────────────────────────────
   document.getElementById('stats-grid').innerHTML=
-    `<div class="stat-card"><div class="stat-card-lbl">Cirugías totales</div><div class="stat-card-val c-az">${programadas}</div><div class="stat-card-sub">en el mes</div></div>`+
+    `<div class="stat-card"><div class="stat-card-lbl">Cirugías programadas</div><div class="stat-card-val c-az">${programadas}</div><div class="stat-card-sub">en el mes</div></div>`+
     `<div class="stat-card"><div class="stat-card-lbl">Completadas</div><div class="stat-card-val c-verde">${realizadas.length}</div><div class="stat-card-sub">${programadas?Math.round(realizadas.length/programadas*100):0}% del total</div></div>`+
     `<div class="stat-card"><div class="stat-card-lbl">Canceladas</div><div class="stat-card-val c-rojo">${canceladas.length}</div><div class="stat-card-sub">${pctCancel}% del total</div></div>`+
-    `<div class="stat-card"><div class="stat-card-lbl">Reintervenciones</div><div class="stat-card-val c-morado">${reinCount}</div><div class="stat-card-sub">${pctRein}% de completadas</div></div>`;
+    `<div class="stat-card"><div class="stat-card-lbl">Días con actividad</div><div class="stat-card-val c-az">${numDias}</div><div class="stat-card-sub">días en el mes</div></div>`;
+
+  // ─── CARDS DE INDICADORES ─────────────────────────────────────────────────
+  function indCard(color, emoji, titulo, formula, valor, desc, barVal){
+    const pct = Math.min(barVal??0, 100);
+    return `<div class="ind-card">
+      <div class="ind-hdr"><div class="ind-dot" style="background:${color}"></div><span class="ind-ttl">${titulo}</span></div>
+      <div style="font-size:10px;color:var(--gris4);margin-bottom:8px;font-family:'DM Mono',monospace">${formula}</div>
+      <div class="ind-val" style="color:${color}">${valor}</div>
+      <div class="ind-desc">${desc}</div>
+      <div class="ind-bar"><div class="ind-fill" style="width:${pct}%;background:${color}"></div></div>
+    </div>`;
+  }
 
   document.getElementById('ind-grid').innerHTML=
-    `<div class="ind-card">
-      <div class="ind-hdr"><div class="ind-dot" style="background:var(--az2)"></div><span class="ind-ttl">Utilización de Quirófanos</span></div>
-      <div class="ind-val c-az">${pctUtil}%</div>
-      <div class="ind-desc">${totalMin} min realizados · 3 salas × 24 h = 4,320 min disponibles/día</div>
-      <div class="ind-bar"><div class="ind-fill" style="width:${Math.min(pctUtil,100)}%;background:var(--az2)"></div></div>
-    </div>`+
-    `<div class="ind-card">
-      <div class="ind-hdr"><div class="ind-dot" style="background:var(--verde2)"></div><span class="ind-ttl">Inicio Puntual de Cirugía</span></div>
-      <div class="ind-val c-verde">${pctPunt!==null?pctPunt+'%':'N/D'}</div>
-      <div class="ind-desc">${conHR.length?`${puntuales} de ${conHR.length} iniciaron a tiempo · Retraso promedio: ${promRet} min`:'Registra "Hora real de inicio" para calcular este indicador'}</div>
-      <div class="ind-bar"><div class="ind-fill" style="width:${pctPunt||0}%;background:var(--verde2)"></div></div>
-    </div>`+
-    `<div class="ind-card">
-      <div class="ind-hdr"><div class="ind-dot" style="background:var(--rojo2)"></div><span class="ind-ttl">Tasa de Cancelación</span></div>
-      <div class="ind-val c-rojo">${pctCancel}%</div>
-      <div class="ind-desc">${canceladas.length} canceladas de ${programadas} programadas</div>
-      <div class="ind-bar"><div class="ind-fill" style="width:${Math.min(pctCancel,100)}%;background:var(--rojo2)"></div></div>
-    </div>`+
-    `<div class="ind-card">
-      <div class="ind-hdr"><div class="ind-dot" style="background:var(--morado)"></div><span class="ind-ttl">Tasa de Reintervención</span></div>
-      <div class="ind-val c-morado">${pctRein}%</div>
-      <div class="ind-desc">${reinCount} reintervenciones de ${realizadas.length} cirugías completadas</div>
-      <div class="ind-bar"><div class="ind-fill" style="width:${Math.min(pctRein,100)}%;background:var(--morado)"></div></div>
-    </div>`;
+    indCard(
+      'var(--az2)', '📊',
+      'Utilización de Quirófano',
+      '(min utilizados / min disponibles) × 100',
+      pctUtil+'%',
+      `${totalMinUsados} min utilizados de ${minDisponibles.toLocaleString()} min disponibles (24 h × 3 salas × ${numDias} días)`,
+      pctUtil
+    )+
+    indCard(
+      'var(--verde)',  '🕑',
+      'Inicio Puntual de Cirugía',
+      '(iniciadas en horario / total programadas) × 100',
+      pctPuntual!==null ? pctPuntual+'%' : 'N/D',
+      conHoraReal.length
+        ? `${puntuales} de ${conHoraReal.length} cirugías iniciaron a tiempo · Retraso promedio: ${promRet} min`
+        : 'Registra la hora real de inicio para calcular este indicador',
+      pctPuntual??0
+    )+
+    indCard(
+      'var(--rojo2)', '🚫',
+      'Cancelación Quirúrgica',
+      '(canceladas / programadas) × 100',
+      pctCancel+'%',
+      `${canceladas.length} cirugías canceladas de ${programadas} programadas`,
+      pctCancel
+    )+
+    indCard(
+      'var(--naranja2)', '🔄',
+      'Tiempo de Rotación de Sala',
+      'promedio de min entre cirugías (descontando 40 min limpieza)',
+      promRot!==null ? promRot+' min' : 'N/D',
+      rotaciones.length
+        ? `Calculado sobre ${rotaciones.length} par${rotaciones.length>1?'es':''} de cirugías consecutivas con hora fin registrada`
+        : 'Registra la hora real de fin para calcular este indicador',
+      promRot!==null ? Math.min(promRot/120*100,100) : 0
+    )+
+    indCard(
+      'var(--morado)', '🔁',
+      'Reintervenciones',
+      '(reintervenciones / total cirugías) × 100',
+      pctRein+'%',
+      `${reinCount} expediente${reinCount!==1?'s':''} con más de una cirugía registrada · ${programadas} cirugías totales`,
+      pctRein
+    );
 }
 
 // ── NAVEGACIÓN POR DÍA ────────────────────────────────────────────────────────
