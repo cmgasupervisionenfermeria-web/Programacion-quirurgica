@@ -929,10 +929,17 @@ function guardarCirugia(){
   const fk=rec.fecha;
   if(!diaDB[fk]) diaDB[fk]=[];
   diaDB[fk].push(rec);
-  saveDia();
-  DB.push(rec); saveDB();
-  toast('✓ Cirugía registrada correctamente');
+  DB.push(rec);
+  showLoader('💾 Guardando en Google Sheets…');
+  apiCall({action:'save', record:rec}).then(()=>{
+    hideLoader();
+    toast('✓ Cirugía registrada y guardada en la nube ☁️');
+  }).catch(()=>{
+    hideLoader();
+    toast('✓ Registrada localmente (sin conexión)','error');
+  });
   limpiarForm();
+  render();
 }
 
 // ── BASE DE DATOS ─────────────────────────────────────────────────────────────
