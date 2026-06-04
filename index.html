@@ -261,9 +261,8 @@ style="width:100%;padding:12px;font-size:20px;text-align:center;border:2px solid
 </div>
 <div class="form-group"><label>Hora programada</label><select id="f-hora"></select></div>
 <div class="form-group"><label>Duración estimada (min)</label><input type="number" id="f-duracion" placeholder="60" min="15" step="15" value="60"></div>
-<div class="form-group"><label>Hora real de inicio</label><select id="f-hora-real" onchange="calcDuracionReal()"></select></div>
-<!-- NUEVO: Hora de finalización -->
-<div class="form-group"><label>Hora real de fin</label><select id="f-hora-fin" onchange="calcDuracionReal()"></select></div>
+<div class="form-group"><label>Hora real de inicio</label><input type="time" id="f-hora-real" onchange="calcDuracionReal()" style="font-family:'DM Mono',monospace"></div>
+<div class="form-group"><label>Hora real de fin</label><input type="time" id="f-hora-fin" onchange="calcDuracionReal()" style="font-family:'DM Mono',monospace"></div>
 <div class="form-group"><label>Duración real (min)</label>
 <input type="number" id="f-duracion-real" placeholder="Calculada automáticamente" readonly
 style="background:var(--gris1);color:var(--gris5);cursor:default">
@@ -272,7 +271,7 @@ style="background:var(--gris1);color:var(--gris5);cursor:default">
 
 <div class="section-lbl">Paciente</div>
 <div class="form-grid">
-<div class="form-group"><label>N° Expediente</label><input type="text" id="f-expediente" placeholder="EXP-001"></div>
+<div class="form-group"><label>N° Expediente <span style="color:var(--gris4);font-weight:400;text-transform:none;font-size:10px">(opcional)</span></label><input type="text" id="f-expediente" placeholder="EXP-001"></div>
 <div class="form-group"><label>Nombre del Paciente</label><input type="text" id="f-paciente" placeholder="Apellidos, Nombre"></div>
 </div>
 
@@ -280,6 +279,15 @@ style="background:var(--gris1);color:var(--gris5);cursor:default">
 <div class="form-cw" id="form-cw"></div>
 <div class="form-grid">
 <div class="form-group full"><label>Procedimiento</label><input type="text" id="f-procedimiento" placeholder="Descripción del procedimiento quirúrgico"></div>
+<div class="form-group"><label>Especialidad</label>
+<input type="text" id="f-especialidad" placeholder="Ej. Cirugía General, Ortopedia…" list="especialidades-list">
+<datalist id="especialidades-list">
+<option>Cirugía General</option><option>Ortopedia y Traumatología</option><option>Ginecología y Obstetricia</option>
+<option>Urología</option><option>Neurocirugía</option><option>Cirugía Plástica</option>
+<option>Oftalmología</option><option>Otorrinolaringología</option><option>Cardiocirugía</option>
+<option>Cirugía Vascular</option><option>Gastroenterología</option><option>Pediatría Quirúrgica</option>
+</datalist>
+</div>
 <div class="form-group"><label>Lateralidad</label>
 <select id="f-lateralidad"><option value="">— Selecciona —</option><option>N/A</option><option>Derecha</option><option>Izquierda</option><option>Bilateral</option></select>
 </div>
@@ -350,7 +358,7 @@ style="background:var(--gris1);color:var(--gris5);cursor:default">
 <table>
 <thead><tr>
 <th>Fecha</th><th>Qx</th><th>Hora Prog.</th><th>N° Exp.</th><th>Paciente</th>
-<th>Procedimiento</th><th>Cirujano</th><th>Lateralidad</th>
+<th>Procedimiento</th><th>Especialidad</th><th>Cirujano</th><th>Lateralidad</th>
 <th>Dur. Est.</th><th>H. Inicio</th><th>H. Fin</th><th>Dur. Real</th>
 <th>Estatus</th><th>Reintervención</th><th>Cir. Segura</th><th>Ev. Adverso</th><th></th>
 </tr></thead>
@@ -514,8 +522,6 @@ function fillSel(id, opts, blank='— Selecciona —'){
   opts.forEach(h=>{ const o=document.createElement('option'); o.value=h; o.textContent=h; s.appendChild(o); });
 }
 fillSel('f-hora', HORAS30);
-fillSel('f-hora-real', HORAS30, '— No registrada —');
-fillSel('f-hora-fin',  HORAS30, '— No registrada —');
 
 // ── CÁLCULO DURACIÓN REAL ─────────────────────────────────────────────────────
 function calcDuracionReal(){
@@ -757,8 +763,6 @@ function openEdit(id){ openForm(gS().find(x=>x.id===id)||{}); }
 function openForm(sg){
   sg=sg||{}; const isN=!sg.id;
   const hOpts=HORAS30.map(h=>`<option value="${h}"${sg.hora===h?' selected':''}>${h}</option>`).join('');
-  const hRealOpts='<option value="">— No registrada —</option>'+HORAS30.map(h=>`<option value="${h}"${sg.horaReal===h?' selected':''}>${h}</option>`).join('');
-  const hFinOpts='<option value="">— No registrada —</option>'+HORAS30.map(h=>`<option value="${h}"${sg.horaFin===h?' selected':''}>${h}</option>`).join('');
   const latOpts=['','N/A','Derecha','Izquierda','Bilateral'].map(l=>`<option value="${l}"${sg.lateralidad===l?' selected':''}>${l||'— Selecciona —'}</option>`).join('');
   const durR = sg.duracionReal || '';
 
@@ -770,9 +774,10 @@ function openForm(sg){
       <div class="form-group"><label>Estado</label><select id="ee">${ESTADOS.map(e=>`<option value="${e}"${sg.estado===e?' selected':''}>${e}</option>`).join('')}</select></div>
       <div class="form-group"><label>Hora programada</label><select id="eh" onchange="chkCf(${sg.id||0})">${hOpts}</select></div>
       <div class="form-group"><label>Duración estimada (min)</label><input id="ed" type="number" min="15" step="15" value="${sg.duracion||60}" oninput="chkCf(${sg.id||0})"></div>
-      <div class="form-group"><label>Hora real inicio</label><select id="ehr" onchange="calcDuracionRealModal()">${hRealOpts}</select></div>
-      <div class="form-group"><label>Hora real fin</label><select id="ehf" onchange="calcDuracionRealModal()">${hFinOpts}</select></div>
+      <div class="form-group"><label>Hora real inicio</label><input type="time" id="ehr" value="${sg.horaReal||''}" onchange="calcDuracionRealModal()" style="font-family:'DM Mono',monospace"></div>
+      <div class="form-group"><label>Hora real fin</label><input type="time" id="ehf" value="${sg.horaFin||''}" onchange="calcDuracionRealModal()" style="font-family:'DM Mono',monospace"></div>
       <div class="form-group"><label>Duración real (min)</label><input id="edurreal" type="number" value="${durR}" readonly style="background:var(--gris1);color:var(--verde);font-weight:600;cursor:default" placeholder="Calculada automáticamente"></div>
+      <div class="form-group"><label>Especialidad</label><input id="eesp" value="${sg.especialidad||''}" placeholder="Ej. Cirugía General" list="esp-list-modal"><datalist id="esp-list-modal"><option>Cirugía General</option><option>Ortopedia y Traumatología</option><option>Ginecología y Obstetricia</option><option>Urología</option><option>Neurocirugía</option><option>Cirugía Plástica</option><option>Oftalmología</option><option>Otorrinolaringología</option><option>Cardiocirugía</option><option>Cirugía Vascular</option><option>Gastroenterología</option><option>Pediatría Quirúrgica</option></datalist></div>
       <div class="form-group"><label>Lateralidad</label><select id="elat">${latOpts}</select></div>
       <div class="form-group"><label>N° Expediente</label><input id="eexp" value="${sg.expediente||''}"></div>
       <div class="form-group full"><label>Paciente</label><input id="ep" value="${sg.paciente||''}"></div>
@@ -837,6 +842,7 @@ async function saveFrm(id){
     anestesiologo:document.getElementById('ea').value.trim(),
     instrumentista:document.getElementById('ei').value.trim(),
     lateralidad:document.getElementById('elat').value,
+    especialidad:document.getElementById('eesp').value.trim(),
     insumos:document.getElementById('em').value.trim(),
     proveedor:document.getElementById('eprov').value.trim(),
   };
@@ -870,7 +876,7 @@ function toggleEventoAdverso(){
 
 function limpiarForm(){
   ['f-sala','f-tipo','f-hora','f-hora-real','f-hora-fin','f-lateralidad','f-expediente','f-paciente',
-   'f-procedimiento','f-cirujano','f-anestesiologo','f-instrumentista','f-estatus',
+   'f-procedimiento','f-especialidad','f-cirujano','f-anestesiologo','f-instrumentista','f-estatus',
    'f-insumos','f-proveedor','f-personal','f-motivo','f-personal-cancel',
    'f-cirugia-segura','f-evento-adverso','f-evento-adverso-desc'].forEach(id=>{
     const el=document.getElementById(id); if(el) el.value='';
@@ -885,7 +891,7 @@ function limpiarForm(){
 }
 
 function guardarCirugia(){
-  const req=['f-fecha','f-sala','f-hora','f-expediente','f-paciente','f-procedimiento','f-cirujano','f-estatus'];
+  const req=['f-fecha','f-sala','f-hora','f-paciente','f-procedimiento','f-cirujano','f-estatus'];
   for(const id of req){
     if(!document.getElementById(id).value.trim()){
       toast('Completa los campos obligatorios','error');
@@ -911,6 +917,7 @@ function guardarCirugia(){
     paciente:document.getElementById('f-paciente').value.trim(),
     tipo:document.getElementById('f-procedimiento').value.trim(),
     tipoQx:document.getElementById('f-tipo').value,
+    especialidad:document.getElementById('f-especialidad').value.trim(),
     lateralidad:document.getElementById('f-lateralidad').value,
     cirujano:document.getElementById('f-cirujano').value.trim(),
     anestesiologo:document.getElementById('f-anestesiologo').value.trim(),
@@ -976,6 +983,7 @@ function renderTabla(){
       <td style="font-family:'DM Mono',monospace;font-size:11px;font-weight:500">${r.expediente||'—'}</td>
       <td style="max-width:150px">${r.paciente||'—'}</td>
       <td style="max-width:150px;color:var(--gris5)">${r.tipo||'—'}</td>
+      <td style="max-width:120px;color:var(--gris5)">${r.especialidad||'—'}</td>
       <td>${r.cirujano||'—'}</td>
       <td>${r.lateralidad||'—'}</td>
       <td style="text-align:center">${r.duracion?r.duracion+' min':'—'}</td>
@@ -1117,12 +1125,24 @@ function renderConcentrado(){
   allRecs.forEach(r=>{ const t=r.tipoQx||'Sin clasificar'; porTipo[t]=(porTipo[t]||0)+1; });
   const tipoResumen = Object.entries(porTipo).map(([t,n])=>`${t}: ${n} (${Math.round(n/programadas*100)}%)`).join(' · ');
 
+  // ─── ESPECIALIDAD Y CIRUJANO MÁS FRECUENTE ────────────────────────────────
+  const porEsp={}, porCir={};
+  allRecs.forEach(r=>{
+    if(r.especialidad){ porEsp[r.especialidad]=(porEsp[r.especialidad]||0)+1; }
+    if(r.cirujano){ porCir[r.cirujano]=(porCir[r.cirujano]||0)+1; }
+  });
+  const topEsp = Object.entries(porEsp).sort((a,b)=>b[1]-a[1]);
+  const topCir = Object.entries(porCir).sort((a,b)=>b[1]-a[1]);
+  const espFrec = topEsp.length ? topEsp[0] : null;
+  const cirFrec = topCir.length ? topCir[0] : null;
+  const promDiario = numDias ? Math.round(programadas/numDias*10)/10 : 0;
+
   // ─── TARJETAS RESUMEN ─────────────────────────────────────────────────────
   document.getElementById('stats-grid').innerHTML=
-    `<div class="stat-card"><div class="stat-card-lbl">Cirugías programadas</div><div class="stat-card-val c-az">${programadas}</div><div class="stat-card-sub">en el mes</div></div>`+
+    `<div class="stat-card"><div class="stat-card-lbl">Cirugías en el mes</div><div class="stat-card-val c-az">${programadas}</div><div class="stat-card-sub">total programadas</div></div>`+
+    `<div class="stat-card"><div class="stat-card-lbl">Promedio diario</div><div class="stat-card-val c-az">${promDiario}</div><div class="stat-card-sub">cirugías por día activo</div></div>`+
     `<div class="stat-card"><div class="stat-card-lbl">Completadas</div><div class="stat-card-val c-verde">${realizadas.length}</div><div class="stat-card-sub">${programadas?Math.round(realizadas.length/programadas*100):0}% del total</div></div>`+
-    `<div class="stat-card"><div class="stat-card-lbl">Canceladas</div><div class="stat-card-val c-rojo">${canceladas.length}</div><div class="stat-card-sub">${pctCancel}% del total</div></div>`+
-    `<div class="stat-card"><div class="stat-card-lbl">Días con actividad</div><div class="stat-card-val c-az">${numDias}</div><div class="stat-card-sub">días en el mes</div></div>`;
+    `<div class="stat-card"><div class="stat-card-lbl">Canceladas</div><div class="stat-card-val c-rojo">${canceladas.length}</div><div class="stat-card-sub">${pctCancel}% del total</div></div>`;
 
   // ─── CARDS DE INDICADORES ─────────────────────────────────────────────────
   function indCard(color, emoji, titulo, formula, valor, desc, barVal){
@@ -1221,6 +1241,34 @@ function renderConcentrado(){
                 <div style="font-size:24px;font-weight:600;color:var(--az)">${n}</div>
                 <div style="font-size:11px;color:var(--gris4)">${Math.round(n/programadas*100)}% del total</div>
                 <div class="ind-bar" style="margin-top:6px"><div class="ind-fill" style="width:${Math.round(n/programadas*100)}%;background:var(--az2)"></div></div>
+              </div>`).join('')}
+          </div>
+        </div>`
+      : '')+
+    (espFrec
+      ? `<div class="ind-card" style="grid-column:1/-1">
+          <div class="ind-hdr"><div class="ind-dot" style="background:var(--az2)"></div><span class="ind-ttl">Especialidad más frecuente</span></div>
+          <div style="display:flex;gap:16px;flex-wrap:wrap;margin-top:8px">
+            ${topEsp.slice(0,6).map(([e,n],i)=>`
+              <div style="flex:1;min-width:140px">
+                <div style="font-size:11px;color:var(--gris5);margin-bottom:4px">${i===0?'🥇 ':''}${e}</div>
+                <div style="font-size:24px;font-weight:600;color:${i===0?'var(--az)':'var(--gris6)'}">${n}</div>
+                <div style="font-size:11px;color:var(--gris4)">${Math.round(n/programadas*100)}% del total</div>
+                <div class="ind-bar" style="margin-top:6px"><div class="ind-fill" style="width:${Math.round(n/programadas*100)}%;background:${i===0?'var(--az2)':'var(--gris3)'}"></div></div>
+              </div>`).join('')}
+          </div>
+        </div>`
+      : '')+
+    (cirFrec
+      ? `<div class="ind-card" style="grid-column:1/-1">
+          <div class="ind-hdr"><div class="ind-dot" style="background:var(--verde2)"></div><span class="ind-ttl">Cirujano más frecuente</span></div>
+          <div style="display:flex;gap:16px;flex-wrap:wrap;margin-top:8px">
+            ${topCir.slice(0,6).map(([c,n],i)=>`
+              <div style="flex:1;min-width:140px">
+                <div style="font-size:11px;color:var(--gris5);margin-bottom:4px">${i===0?'🥇 ':''}${c}</div>
+                <div style="font-size:24px;font-weight:600;color:${i===0?'var(--verde)':'var(--gris6)'}">${n}</div>
+                <div style="font-size:11px;color:var(--gris4)">${Math.round(n/programadas*100)}% del total</div>
+                <div class="ind-bar" style="margin-top:6px"><div class="ind-fill" style="width:${Math.round(n/programadas*100)}%;background:${i===0?'var(--verde2)':'var(--gris3)'}"></div></div>
               </div>`).join('')}
           </div>
         </div>`
