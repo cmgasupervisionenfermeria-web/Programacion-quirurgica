@@ -257,7 +257,7 @@ style="width:100%;padding:12px;font-size:20px;text-align:center;border:2px solid
 <select id="f-sala"><option value="">— Selecciona —</option><option>Quirófano 1</option><option>Quirófano 2</option><option>Quirófano 3</option></select>
 </div>
 <div class="form-group"><label>Tipo de cirugía</label>
-<select id="f-tipo"><option value="">— Selecciona —</option><option>Electiva</option><option>Urgencia</option><option>Emergencia</option></select>
+<select id="f-tipo"><option value="">— Selecciona —</option><option>Programada</option><option>Programada espontánea</option><option>Urgente</option></select>
 </div>
 <div class="form-group"><label>Hora programada</label><select id="f-hora"></select></div>
 <div class="form-group"><label>Duración estimada (min)</label><input type="number" id="f-duracion" placeholder="60" min="15" step="15" value="60"></div>
@@ -287,7 +287,21 @@ style="background:var(--gris1);color:var(--gris5);cursor:default">
 <div class="form-group"><label>Anestesiólogo</label><input type="text" id="f-anestesiologo" placeholder="Dr. / Dra."></div>
 <div class="form-group"><label>Instrumentista</label><input type="text" id="f-instrumentista" placeholder="Enf. / Nombre"></div>
 <div class="form-group"><label>Estatus</label>
-<select id="f-estatus" onchange="toggleCancel()"><option value="">— Selecciona —</option><option>Pendiente</option><option>En curso</option><option>Completada</option><option>Cancelada</option><option>Suspendida</option></select>
+<select id="f-estatus" onchange="toggleCancel()"><option value="">— Selecciona —</option><option>Pendiente</option><option>En curso</option><option>Completada</option><option>Cancelada</option><option>Suspendida</option><option>Fallecimiento</option></select>
+</div>
+</div>
+
+<div class="section-lbl">Indicadores de calidad</div>
+<div class="form-grid">
+<div class="form-group"><label>Hoja de Cirugía Segura</label>
+<select id="f-cirugia-segura"><option value="">— Selecciona —</option><option>Completa</option><option>Incompleta</option><option>No aplica</option></select>
+</div>
+<div class="form-group"><label>Evento Adverso</label>
+<select id="f-evento-adverso" onchange="toggleEventoAdverso()"><option value="">— Selecciona —</option><option>No</option><option>Sí</option></select>
+</div>
+<div class="form-group full" id="evento-adverso-desc-wrap" style="display:none">
+<label>Descripción del Evento Adverso</label>
+<input type="text" id="f-evento-adverso-desc" placeholder="Describa el evento adverso ocurrido">
 </div>
 </div>
 
@@ -338,7 +352,7 @@ style="background:var(--gris1);color:var(--gris5);cursor:default">
 <th>Fecha</th><th>Qx</th><th>Hora Prog.</th><th>N° Exp.</th><th>Paciente</th>
 <th>Procedimiento</th><th>Cirujano</th><th>Lateralidad</th>
 <th>Dur. Est.</th><th>H. Inicio</th><th>H. Fin</th><th>Dur. Real</th>
-<th>Estatus</th><th>Reintervención</th><th></th>
+<th>Estatus</th><th>Reintervención</th><th>Cir. Segura</th><th>Ev. Adverso</th><th></th>
 </tr></thead>
 <tbody id="tabla-body"></tbody>
 </table>
@@ -846,13 +860,19 @@ document.getElementById('f-fecha').value=hoy;
 
 function toggleCancel(){
   const est=document.getElementById('f-estatus').value;
-  document.getElementById('cancel-sec').classList.toggle('show',est==='Cancelada');
+  document.getElementById('cancel-sec').classList.toggle('show',est==='Cancelada'||est==='Suspendida');
+}
+
+function toggleEventoAdverso(){
+  const val=document.getElementById('f-evento-adverso').value;
+  document.getElementById('evento-adverso-desc-wrap').style.display=val==='Sí'?'block':'none';
 }
 
 function limpiarForm(){
   ['f-sala','f-tipo','f-hora','f-hora-real','f-hora-fin','f-lateralidad','f-expediente','f-paciente',
    'f-procedimiento','f-cirujano','f-anestesiologo','f-instrumentista','f-estatus',
-   'f-insumos','f-proveedor','f-personal','f-motivo','f-personal-cancel'].forEach(id=>{
+   'f-insumos','f-proveedor','f-personal','f-motivo','f-personal-cancel',
+   'f-cirugia-segura','f-evento-adverso','f-evento-adverso-desc'].forEach(id=>{
     const el=document.getElementById(id); if(el) el.value='';
   });
   document.getElementById('f-fecha').value=hoy;
@@ -861,6 +881,7 @@ function limpiarForm(){
   dr.value=''; dr.placeholder='Calculada automáticamente'; dr.style.color='var(--gris5)'; dr.style.fontWeight='';
   document.getElementById('cancel-sec').classList.remove('show');
   document.getElementById('form-cw').classList.remove('vis');
+  document.getElementById('evento-adverso-desc-wrap').style.display='none';
 }
 
 function guardarCirugia(){
@@ -900,6 +921,9 @@ function guardarCirugia(){
     personal:document.getElementById('f-personal').value.trim(),
     motivo:document.getElementById('f-motivo').value.trim(),
     personalCancel:document.getElementById('f-personal-cancel').value.trim(),
+    cirugiaSegura:document.getElementById('f-cirugia-segura').value,
+    eventoAdverso:document.getElementById('f-evento-adverso').value,
+    eventoAdversoDesc:document.getElementById('f-evento-adverso-desc').value.trim(),
     _fecha:document.getElementById('f-fecha').value,
   };
   const fk=rec.fecha;
@@ -953,6 +977,12 @@ function renderTabla(){
       <td style="text-align:center">${durRealCell}</td>
       <td>${badgeEst(r.estado)}</td>
       <td>${rein?'<span class="badge b-si">Sí</span>':'<span class="badge b-no">No</span>'}</td>
+      <td>${r.cirugiaSegura
+        ? `<span class="badge ${r.cirugiaSegura==='Completa'?'b-completada':r.cirugiaSegura==='Incompleta'?'b-traslape':'b-cancelada'}">${r.cirugiaSegura}</span>`
+        : '—'}</td>
+      <td>${r.eventoAdverso==='Sí'
+        ? `<span class="badge b-traslape" title="${r.eventoAdversoDesc||''}">⚠ Sí</span>`
+        : r.eventoAdverso==='No'?'<span class="badge b-no">No</span>':'—'}</td>
       <td><button class="btn btn-ghost btn-sm" style="color:var(--rojo2)" onclick="eliminarDB(${r.id})">✕</button></td>
     </tr>`;
   }).join('');
@@ -975,8 +1005,8 @@ function limpFiltros(){
 
 function exportarCSV(){
   if(!DB.length){toast('Sin datos para exportar','error');return}
-  const cols=['fecha','qx','hora','horaReal','horaFin','duracionReal','expediente','paciente','tipo','tipoQx','lateralidad','cirujano','anestesiologo','instrumentista','duracion','estado','insumos','proveedor','personal','motivo','personalCancel'];
-  const hdrs=['Fecha','Quirófano','Hora Prog.','Hora Real Inicio','Hora Real Fin','Duración Real (min)','N° Expediente','Paciente','Procedimiento','Tipo Qx','Lateralidad','Cirujano','Anestesiólogo','Instrumentista','Duración Est. (min)','Estatus','Insumos','Proveedor','Personal','Motivo Cancelación','Personal Cancela'];
+  const cols=['fecha','qx','hora','horaReal','horaFin','duracionReal','expediente','paciente','tipo','tipoQx','lateralidad','cirujano','anestesiologo','instrumentista','duracion','estado','cirugiaSegura','eventoAdverso','eventoAdversoDesc','insumos','proveedor','personal','motivo','personalCancel'];
+  const hdrs=['Fecha','Quirófano','Hora Prog.','Hora Real Inicio','Hora Real Fin','Duración Real (min)','N° Expediente','Paciente','Procedimiento','Tipo Cirugía','Lateralidad','Cirujano','Anestesiólogo','Instrumentista','Duración Est. (min)','Estatus','Hoja Cir. Segura','Evento Adverso','Desc. Evento Adverso','Insumos','Proveedor','Personal','Motivo Cancelación','Personal Cancela'];
   const csv=[hdrs.join(','),...DB.map(r=>cols.map(c=>`"${(r[c]||'').toString().replace(/"/g,'""')}"`).join(','))].join('\n');
   const a=document.createElement('a');
   a.href='data:text/csv;charset=utf-8,\uFEFF'+encodeURIComponent(csv);
@@ -1062,6 +1092,24 @@ function renderConcentrado(){
   const reinCount = expMes.filter(exp=>DB.filter(r=>r.expediente===exp).length>1).length;
   const pctRein = programadas ? Math.round(reinCount/programadas*1000)/10 : 0;
 
+  // ─── MORTALIDAD ───────────────────────────────────────────────────────────
+  const fallecimientos = allRecs.filter(r=>(r.estado||'').toLowerCase()==='fallecimiento');
+  const pctMortalidad  = programadas ? Math.round(fallecimientos.length/programadas*1000)/10 : 0;
+
+  // ─── CIRUGÍA SEGURA ───────────────────────────────────────────────────────
+  const conCirSegura    = allRecs.filter(r=>r.cirugiaSegura&&r.cirugiaSegura!=='');
+  const cirSeguraCompl  = allRecs.filter(r=>r.cirugiaSegura==='Completa');
+  const pctCirSegura    = conCirSegura.length ? Math.round(cirSeguraCompl.length/conCirSegura.length*1000)/10 : null;
+
+  // ─── EVENTO ADVERSO ───────────────────────────────────────────────────────
+  const eventosAdversos = allRecs.filter(r=>r.eventoAdverso==='Sí');
+  const pctEventos      = programadas ? Math.round(eventosAdversos.length/programadas*1000)/10 : 0;
+
+  // ─── TIPO DE CIRUGÍA ──────────────────────────────────────────────────────
+  const porTipo = {};
+  allRecs.forEach(r=>{ const t=r.tipoQx||'Sin clasificar'; porTipo[t]=(porTipo[t]||0)+1; });
+  const tipoResumen = Object.entries(porTipo).map(([t,n])=>`${t}: ${n} (${Math.round(n/programadas*100)}%)`).join(' · ');
+
   // ─── TARJETAS RESUMEN ─────────────────────────────────────────────────────
   document.getElementById('stats-grid').innerHTML=
     `<div class="stat-card"><div class="stat-card-lbl">Cirugías programadas</div><div class="stat-card-val c-az">${programadas}</div><div class="stat-card-sub">en el mes</div></div>`+
@@ -1125,7 +1173,51 @@ function renderConcentrado(){
       pctRein+'%',
       `${reinCount} expediente${reinCount!==1?'s':''} con más de una cirugía registrada · ${programadas} cirugías totales`,
       pctRein
-    );
+    )+
+    indCard(
+      'var(--verde)', '✅',
+      'Cumplimiento — Hoja de Cirugía Segura',
+      '(hojas completas / total con registro) × 100',
+      pctCirSegura!==null ? pctCirSegura+'%' : 'N/D',
+      conCirSegura.length
+        ? `${cirSeguraCompl.length} completas de ${conCirSegura.length} registradas · ${allRecs.length-conCirSegura.length} sin capturar`
+        : 'Registra la Hoja de Cirugía Segura en cada procedimiento',
+      pctCirSegura??0
+    )+
+    indCard(
+      'var(--naranja)', '⚠️',
+      'Eventos Adversos',
+      '(eventos adversos / total cirugías) × 100',
+      pctEventos+'%',
+      eventosAdversos.length
+        ? `${eventosAdversos.length} evento${eventosAdversos.length!==1?'s':''} registrado${eventosAdversos.length!==1?'s':''} de ${programadas} cirugías`
+        : 'Sin eventos adversos registrados en el mes',
+      Math.min(pctEventos*5, 100)
+    )+
+    indCard(
+      'var(--gris6)', '💀',
+      'Mortalidad Quirúrgica',
+      '(fallecimientos / total cirugías) × 100',
+      pctMortalidad+'%',
+      fallecimientos.length
+        ? `${fallecimientos.length} fallecimiento${fallecimientos.length!==1?'s':''} de ${programadas} cirugías en el mes`
+        : 'Sin fallecimientos registrados en el mes',
+      Math.min(pctMortalidad*10, 100)
+    )+
+    (programadas
+      ? `<div class="ind-card" style="grid-column:1/-1">
+          <div class="ind-hdr"><div class="ind-dot" style="background:var(--az2)"></div><span class="ind-ttl">Distribución por Tipo de Cirugía</span></div>
+          <div style="display:flex;gap:16px;flex-wrap:wrap;margin-top:8px">
+            ${Object.entries(porTipo).map(([t,n])=>`
+              <div style="flex:1;min-width:120px">
+                <div style="font-size:11px;color:var(--gris5);margin-bottom:4px">${t}</div>
+                <div style="font-size:24px;font-weight:600;color:var(--az)">${n}</div>
+                <div style="font-size:11px;color:var(--gris4)">${Math.round(n/programadas*100)}% del total</div>
+                <div class="ind-bar" style="margin-top:6px"><div class="ind-fill" style="width:${Math.round(n/programadas*100)}%;background:var(--az2)"></div></div>
+              </div>`).join('')}
+          </div>
+        </div>`
+      : '');
 }
 
 // ── NAVEGACIÓN POR DÍA ────────────────────────────────────────────────────────
