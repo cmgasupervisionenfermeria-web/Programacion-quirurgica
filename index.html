@@ -329,11 +329,11 @@ style="background:var(--gris1);color:var(--gris5);cursor:default">
 <label>Descripción de la pieza</label>
 <input type="text" id="f-pieza-desc" placeholder="Ej. Vesícula biliar, apéndice, tumor…">
 </div>
-<div class="form-group full" id="pieza-destino-wrap" style="display:none">
+<div class="form-group" id="pieza-destino-wrap" style="display:none">
 <label>Destino de la pieza</label>
 <select id="f-pieza-destino"><option value="">— Selecciona —</option><option>Patología</option><option>Cultivo</option><option>Banco de tejidos</option><option>Entregada a familiar</option><option>Otro</option></select>
 </div>
-<div class="form-group full" id="pieza-patologo-wrap" style="display:none">
+<div class="form-group" id="pieza-patologo-wrap" style="display:none">
 <label>Patólogo / Laboratorio</label>
 <input type="text" id="f-pieza-patologo" placeholder="Nombre del patólogo o laboratorio">
 </div>
@@ -817,7 +817,7 @@ function openForm(sg){
       <div class="form-group"><label>Proveedor</label><input id="eprov" value="${sg.proveedor||''}"></div>
     </div>`+
     `<div style="font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--gris4);padding:10px 0 8px;border-bottom:1px solid var(--gris2);margin-bottom:10px">Pieza Patológica</div>`+
-    `<div class="form-grid" style="gap:10px;margin-bottom:10px">
+    `<div class="form-grid-3" style="gap:10px;margin-bottom:10px">
       <div class="form-group"><label>¿Hubo pieza patológica?</label>
         <select id="epiezapat" onchange="togglePiezaPatModal()">
           <option value="">— Selecciona —</option>
