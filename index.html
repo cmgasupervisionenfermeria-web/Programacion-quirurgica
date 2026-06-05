@@ -320,6 +320,21 @@ style="background:var(--gris1);color:var(--gris5);cursor:default">
 <div class="form-group"><label>Personal que Programa</label><input type="text" id="f-personal"></div>
 </div>
 
+<div class="section-lbl">Pieza Patológica</div>
+<div class="form-grid">
+<div class="form-group"><label>¿Hubo pieza patológica?</label>
+<select id="f-pieza-pat" onchange="togglePiezaPat()"><option value="">— Selecciona —</option><option>Sí</option><option>No</option></select>
+</div>
+<div class="form-group full" id="pieza-pat-wrap" style="display:none">
+<label>Descripción de la pieza</label>
+<input type="text" id="f-pieza-desc" placeholder="Ej. Vesícula biliar, apéndice, tumor…">
+</div>
+<div class="form-group full" id="pieza-destino-wrap" style="display:none">
+<label>Destino de la pieza</label>
+<select id="f-pieza-destino"><option value="">— Selecciona —</option><option>Patología</option><option>Cultivo</option><option>Banco de tejidos</option><option>Entregada a familiar</option><option>Otro</option></select>
+</div>
+</div>
+
 <div class="cancel-sec" id="cancel-sec">
 <p>⚠ Cancelación / Suspensión</p>
 <div class="form-grid">
@@ -716,6 +731,12 @@ function openDetail(id){
     `<div class="dm-row"><span class="dm-lbl">Instrumentista</span><span>${sg.instrumentista||'—'}</span></div>`+
     `<div class="dm-row"><span class="dm-lbl">Lateralidad</span><span>${sg.lateralidad||'—'}</span></div>`+
     `<div class="dm-row"><span class="dm-lbl">Insumos</span><span>${sg.insumos||'—'}</span></div>`+
+    `<div class="dm-row"><span class="dm-lbl">Programó</span><span>${sg.personal||'—'}</span></div>`+
+    (sg.piezaPat==='Sí'?
+      `<div class="dm-row"><span class="dm-lbl">Pieza patológica</span><span style="color:var(--verde);font-weight:500">✓ Sí</span></div>`+
+      `<div class="dm-row"><span class="dm-lbl">Descripción</span><span>${sg.piezaDesc||'—'}</span></div>`+
+      `<div class="dm-row"><span class="dm-lbl">Destino</span><span>${sg.piezaDestino||'—'}</span></div>`
+      : sg.piezaPat==='No'?`<div class="dm-row"><span class="dm-lbl">Pieza patológica</span><span>No</span></div>`:'')+
     (sg.motivo?`<div class="dm-row"><span class="dm-lbl">Motivo cancelación</span><span>${sg.motivo}</span></div>`:'')+
     `<div class="form-actions">
       <button class="btn-del" onclick="requirePin(()=>delSg(${id}))">🗑 Eliminar</button>
@@ -845,6 +866,9 @@ async function saveFrm(id){
     especialidad:document.getElementById('eesp').value.trim(),
     insumos:document.getElementById('em').value.trim(),
     proveedor:document.getElementById('eprov').value.trim(),
+    piezaPat:document.getElementById('epiezapat')||''?document.getElementById('epiezapat').value:'',
+    piezaDesc:document.getElementById('epiezadesc')||''?document.getElementById('epiezadesc').value.trim():'',
+    piezaDestino:document.getElementById('epiezadestino')||''?document.getElementById('epiezadestino').value:'',
   };
   showLoader('💾 Guardando…');
   if(id){
@@ -869,6 +893,13 @@ function toggleCancel(){
   document.getElementById('cancel-sec').classList.toggle('show',est==='Cancelada'||est==='Suspendida');
 }
 
+function togglePiezaPat(){
+  const val=document.getElementById('f-pieza-pat').value;
+  const show = val==='Sí';
+  document.getElementById('pieza-pat-wrap').style.display=show?'block':'none';
+  document.getElementById('pieza-destino-wrap').style.display=show?'block':'none';
+}
+
 function toggleEventoAdverso(){
   const val=document.getElementById('f-evento-adverso').value;
   document.getElementById('evento-adverso-desc-wrap').style.display=val==='Sí'?'block':'none';
@@ -878,7 +909,8 @@ function limpiarForm(){
   ['f-sala','f-tipo','f-hora','f-hora-real','f-hora-fin','f-lateralidad','f-expediente','f-paciente',
    'f-procedimiento','f-especialidad','f-cirujano','f-anestesiologo','f-instrumentista','f-estatus',
    'f-insumos','f-proveedor','f-personal','f-motivo','f-personal-cancel',
-   'f-cirugia-segura','f-evento-adverso','f-evento-adverso-desc'].forEach(id=>{
+   'f-cirugia-segura','f-evento-adverso','f-evento-adverso-desc',
+   'f-pieza-pat','f-pieza-desc','f-pieza-destino'].forEach(id=>{
     const el=document.getElementById(id); if(el) el.value='';
   });
   document.getElementById('f-fecha').value=hoy;
@@ -888,6 +920,8 @@ function limpiarForm(){
   document.getElementById('cancel-sec').classList.remove('show');
   document.getElementById('form-cw').classList.remove('vis');
   document.getElementById('evento-adverso-desc-wrap').style.display='none';
+  document.getElementById('pieza-pat-wrap').style.display='none';
+  document.getElementById('pieza-destino-wrap').style.display='none';
 }
 
 function guardarCirugia(){
@@ -931,6 +965,9 @@ function guardarCirugia(){
     cirugiaSegura:document.getElementById('f-cirugia-segura').value,
     eventoAdverso:document.getElementById('f-evento-adverso').value,
     eventoAdversoDesc:document.getElementById('f-evento-adverso-desc').value.trim(),
+    piezaPat:document.getElementById('f-pieza-pat').value,
+    piezaDesc:document.getElementById('f-pieza-desc').value.trim(),
+    piezaDestino:document.getElementById('f-pieza-destino').value,
     _fecha:document.getElementById('f-fecha').value,
   };
   const fk=rec.fecha;
@@ -1020,8 +1057,8 @@ function limpFiltros(){
 
 function exportarCSV(){
   if(!DB.length){toast('Sin datos para exportar','error');return}
-  const cols=['fecha','qx','hora','horaReal','horaFin','duracionReal','expediente','paciente','tipo','tipoQx','lateralidad','cirujano','anestesiologo','instrumentista','duracion','estado','cirugiaSegura','eventoAdverso','eventoAdversoDesc','insumos','proveedor','personal','motivo','personalCancel'];
-  const hdrs=['Fecha','Quirófano','Hora Prog.','Hora Real Inicio','Hora Real Fin','Duración Real (min)','N° Expediente','Paciente','Procedimiento','Tipo Cirugía','Lateralidad','Cirujano','Anestesiólogo','Instrumentista','Duración Est. (min)','Estatus','Hoja Cir. Segura','Evento Adverso','Desc. Evento Adverso','Insumos','Proveedor','Personal','Motivo Cancelación','Personal Cancela'];
+  const cols=['fecha','qx','hora','horaReal','horaFin','duracionReal','expediente','paciente','tipo','tipoQx','especialidad','lateralidad','cirujano','anestesiologo','instrumentista','duracion','estado','cirugiaSegura','eventoAdverso','eventoAdversoDesc','piezaPat','piezaDesc','piezaDestino','insumos','proveedor','personal','motivo','personalCancel'];
+  const hdrs=['Fecha','Quirófano','Hora Prog.','Hora Real Inicio','Hora Real Fin','Duración Real (min)','N° Expediente','Paciente','Procedimiento','Tipo Cirugía','Especialidad','Lateralidad','Cirujano','Anestesiólogo','Instrumentista','Duración Est. (min)','Estatus','Hoja Cir. Segura','Evento Adverso','Desc. Evento Adverso','Pieza Patológica','Desc. Pieza','Destino Pieza','Insumos','Proveedor','Personal','Motivo Cancelación','Personal Cancela'];
   const csv=[hdrs.join(','),...DB.map(r=>cols.map(c=>`"${(r[c]||'').toString().replace(/"/g,'""')}"`).join(','))].join('\n');
   const a=document.createElement('a');
   a.href='data:text/csv;charset=utf-8,\uFEFF'+encodeURIComponent(csv);
