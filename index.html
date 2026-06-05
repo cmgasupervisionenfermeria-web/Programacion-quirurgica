@@ -333,6 +333,10 @@ style="background:var(--gris1);color:var(--gris5);cursor:default">
 <label>Destino de la pieza</label>
 <select id="f-pieza-destino"><option value="">— Selecciona —</option><option>Patología</option><option>Cultivo</option><option>Banco de tejidos</option><option>Entregada a familiar</option><option>Otro</option></select>
 </div>
+<div class="form-group full" id="pieza-patologo-wrap" style="display:none">
+<label>Patólogo / Laboratorio</label>
+<input type="text" id="f-pieza-patologo" placeholder="Nombre del patólogo o laboratorio">
+</div>
 </div>
 
 <div class="cancel-sec" id="cancel-sec">
@@ -736,7 +740,8 @@ function openDetail(id){
       `<div class="dm-row"><span class="dm-lbl">Pieza patológica</span><span style="${sg.piezaPat==='Sí'?'color:var(--verde);font-weight:500':''}">${sg.piezaPat==='Sí'?'✓ Sí':'No'}</span></div>`+
       (sg.piezaPat==='Sí'?
         `<div class="dm-row"><span class="dm-lbl">Descripción</span><span>${sg.piezaDesc||'—'}</span></div>`+
-        `<div class="dm-row"><span class="dm-lbl">Destino</span><span>${sg.piezaDestino||'—'}</span></div>`
+        `<div class="dm-row"><span class="dm-lbl">Destino</span><span>${sg.piezaDestino||'—'}</span></div>`+
+        `<div class="dm-row"><span class="dm-lbl">Patólogo / Lab.</span><span>${sg.piezaPatologo||'—'}</span></div>`
       :'')
     :'')+
     (sg.motivo?`<div class="dm-row"><span class="dm-lbl">Motivo cancelación</span><span>${sg.motivo}</span></div>`:'')+
@@ -831,6 +836,10 @@ function openForm(sg){
           ${['Patología','Cultivo','Banco de tejidos','Entregada a familiar','Otro'].map(o=>`<option value="${o}"${sg.piezaDestino===o?' selected':''}>${o}</option>`).join('')}
         </select>
       </div>
+      <div class="form-group" id="epiezapatologo-wrap" style="display:${sg.piezaPat==='Sí'?'flex':'none'};flex-direction:column;gap:3px">
+        <label>Patólogo / Laboratorio</label>
+        <input id="epiezapatologo" value="${sg.piezaPatologo||''}" placeholder="Nombre del patólogo o laboratorio">
+      </div>
     </div>`+
     `<div class="form-actions">
       ${sg.id?`<button class="btn-del" onclick="delSg(${sg.id})">🗑 Eliminar</button>`:''}
@@ -892,6 +901,7 @@ async function saveFrm(id){
     piezaPat:document.getElementById('epiezapat').value,
     piezaDesc:document.getElementById('epiezadesc')?.value.trim()||'',
     piezaDestino:document.getElementById('epiezadestino')?.value||'',
+    piezaPatologo:document.getElementById('epiezapatologo')?.value.trim()||'',
   };
   showLoader('💾 Guardando…');
   if(id){
@@ -921,6 +931,7 @@ function togglePiezaPat(){
   const show = val==='Sí';
   document.getElementById('pieza-pat-wrap').style.display=show?'block':'none';
   document.getElementById('pieza-destino-wrap').style.display=show?'block':'none';
+  document.getElementById('pieza-patologo-wrap').style.display=show?'block':'none';
 }
 
 function togglePiezaPatModal(){
@@ -928,6 +939,7 @@ function togglePiezaPatModal(){
   const show=val==='Sí';
   document.getElementById('epiezadesc-wrap').style.display=show?'flex':'none';
   document.getElementById('epiezadestino-wrap').style.display=show?'flex':'none';
+  document.getElementById('epiezapatologo-wrap').style.display=show?'flex':'none';
 }
 
 function toggleEventoAdverso(){
@@ -940,7 +952,7 @@ function limpiarForm(){
    'f-procedimiento','f-especialidad','f-cirujano','f-anestesiologo','f-instrumentista','f-estatus',
    'f-insumos','f-proveedor','f-personal','f-motivo','f-personal-cancel',
    'f-cirugia-segura','f-evento-adverso','f-evento-adverso-desc',
-   'f-pieza-pat','f-pieza-desc','f-pieza-destino'].forEach(id=>{
+   'f-pieza-pat','f-pieza-desc','f-pieza-destino','f-pieza-patologo'].forEach(id=>{
     const el=document.getElementById(id); if(el) el.value='';
   });
   document.getElementById('f-fecha').value=hoy;
@@ -952,6 +964,7 @@ function limpiarForm(){
   document.getElementById('evento-adverso-desc-wrap').style.display='none';
   document.getElementById('pieza-pat-wrap').style.display='none';
   document.getElementById('pieza-destino-wrap').style.display='none';
+  document.getElementById('pieza-patologo-wrap').style.display='none';
 }
 
 function guardarCirugia(){
@@ -998,6 +1011,7 @@ function guardarCirugia(){
     piezaPat:document.getElementById('f-pieza-pat').value,
     piezaDesc:document.getElementById('f-pieza-desc').value.trim(),
     piezaDestino:document.getElementById('f-pieza-destino').value,
+    piezaPatologo:document.getElementById('f-pieza-patologo').value.trim(),
     _fecha:document.getElementById('f-fecha').value,
   };
   const fk=rec.fecha;
