@@ -722,7 +722,7 @@ function openDetail(id){
     `<div class="dm-row"><span class="dm-lbl">Quirófano</span><span>${sg.qx}</span></div>`+
     `<div class="dm-row"><span class="dm-lbl">N° Expediente</span><span style="font-family:'DM Mono',monospace">${sg.expediente||'—'}</span></div>`+
     `<div class="dm-row"><span class="dm-lbl">Cirugía</span><span>${sg.tipo||'—'}</span></div>`+
-    `<div class="dm-row"><span class="dm-lbl">Hora / Dur. estimada</span><span>${sg.hora} · ${sg.duracion} min</span></div>`+
+    `<div class="dm-row"><span class="dm-lbl">Hora / Dur. estimada</span><span>${sg.hora} · ${sg.duracion||'—'} min</span></div>`+
     `<div class="dm-row"><span class="dm-lbl">Hora real inicio</span><span>${sg.horaReal||'—'}</span></div>`+
     `<div class="dm-row"><span class="dm-lbl">Hora real fin</span><span>${sg.horaFin||'—'}</span></div>`+
     `<div class="dm-row"><span class="dm-lbl">Duración real</span>${durRealHTML}</div>`+
@@ -732,11 +732,13 @@ function openDetail(id){
     `<div class="dm-row"><span class="dm-lbl">Lateralidad</span><span>${sg.lateralidad||'—'}</span></div>`+
     `<div class="dm-row"><span class="dm-lbl">Insumos</span><span>${sg.insumos||'—'}</span></div>`+
     `<div class="dm-row"><span class="dm-lbl">Programó</span><span>${sg.personal||'—'}</span></div>`+
-    (sg.piezaPat==='Sí'?
-      `<div class="dm-row"><span class="dm-lbl">Pieza patológica</span><span style="color:var(--verde);font-weight:500">✓ Sí</span></div>`+
-      `<div class="dm-row"><span class="dm-lbl">Descripción</span><span>${sg.piezaDesc||'—'}</span></div>`+
-      `<div class="dm-row"><span class="dm-lbl">Destino</span><span>${sg.piezaDestino||'—'}</span></div>`
-      : sg.piezaPat==='No'?`<div class="dm-row"><span class="dm-lbl">Pieza patológica</span><span>No</span></div>`:'')+
+    (sg.piezaPat?
+      `<div class="dm-row"><span class="dm-lbl">Pieza patológica</span><span style="${sg.piezaPat==='Sí'?'color:var(--verde);font-weight:500':''}">${sg.piezaPat==='Sí'?'✓ Sí':'No'}</span></div>`+
+      (sg.piezaPat==='Sí'?
+        `<div class="dm-row"><span class="dm-lbl">Descripción</span><span>${sg.piezaDesc||'—'}</span></div>`+
+        `<div class="dm-row"><span class="dm-lbl">Destino</span><span>${sg.piezaDestino||'—'}</span></div>`
+      :'')
+    :'')+
     (sg.motivo?`<div class="dm-row"><span class="dm-lbl">Motivo cancelación</span><span>${sg.motivo}</span></div>`:'')+
     `<div class="form-actions">
       <button class="btn-del" onclick="requirePin(()=>delSg(${id}))">🗑 Eliminar</button>
