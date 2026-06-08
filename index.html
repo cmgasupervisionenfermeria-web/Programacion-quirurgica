@@ -479,7 +479,8 @@ async function cargarDatos(){
       r.horaFin  = fixHora(r.horaFin);
       // Recalcular duración real si hay hora inicio y fin
       if(r.horaReal && r.horaFin){
-        const dr = pH(r.horaFin) - pH(r.horaReal);
+        let dr = pH(r.horaFin) - pH(r.horaReal);
+        if(dr < 0) dr += 1440; // cruce de medianoche
         if(dr > 0) r.duracionReal = dr;
       }
       const f=r.fecha||r._fecha;
@@ -722,7 +723,7 @@ function openDetail(id){
     (isc&&others.length?`<div class="conflict-warn">⚠ Traslape con: ${others.map(o=>o.paciente.split(',')[0]+' ('+o.hora+')').join(', ')}</div>`:'')+
     (isRein?`<div style="background:var(--morado3);border:1px solid #D8B4FE;border-radius:8px;padding:10px 12px;margin-bottom:12px;font-size:12px;color:var(--morado)">🔄 Reintervención detectada — expediente ${sg.expediente} aparece ${reinDB.length} veces en la base de datos</div>`:'')+
     `<div style="margin-bottom:8px">${badgeEst(sg.estado)}</div>`+
-    `<div class="sbtns">${ESTADOS.map(e=>`<button class="sbtn ${e.toLowerCase().replace(' ','-')}${sg.estado===e?' active-s':''}" onclick="chSt(${id},'${e}')">${e}</button>`).join('')}</div>`+
+    `<div class="sbtns">${ESTADOS.map(e=>`<button class="sbtn ${e.toLowerCase().replace(' ','-')}${sg.estado===e?' active-s':''}" onclick="requirePin(()=>chSt(${id},'${e}'))">${e}</button>`).join('')}</div>`+
     `<div class="dm-row"><span class="dm-lbl">Quirófano</span><span>${sg.qx}</span></div>`+
     `<div class="dm-row"><span class="dm-lbl">N° Expediente</span><span style="font-family:'DM Mono',monospace">${sg.expediente||'—'}</span></div>`+
     `<div class="dm-row"><span class="dm-lbl">Cirugía</span><span>${sg.tipo||'—'}</span></div>`+
@@ -736,13 +737,11 @@ function openDetail(id){
     `<div class="dm-row"><span class="dm-lbl">Lateralidad</span><span>${sg.lateralidad||'—'}</span></div>`+
     `<div class="dm-row"><span class="dm-lbl">Insumos</span><span>${sg.insumos||'—'}</span></div>`+
     `<div class="dm-row"><span class="dm-lbl">Programó</span><span>${sg.personal||'—'}</span></div>`+
-    (sg.piezaPat?
-      `<div class="dm-row"><span class="dm-lbl">Pieza patológica</span><span style="${sg.piezaPat==='Sí'?'color:var(--verde);font-weight:500':''}">${sg.piezaPat==='Sí'?'✓ Sí':'No'}</span></div>`+
-      (sg.piezaPat==='Sí'?
-        `<div class="dm-row"><span class="dm-lbl">Descripción</span><span>${sg.piezaDesc||'—'}</span></div>`+
-        `<div class="dm-row"><span class="dm-lbl">Destino</span><span>${sg.piezaDestino||'—'}</span></div>`+
-        `<div class="dm-row"><span class="dm-lbl">Patólogo / Lab.</span><span>${sg.piezaPatologo||'—'}</span></div>`
-      :'')
+    `<div class="dm-row"><span class="dm-lbl">Pieza patológica</span><span style="${sg.piezaPat==='Sí'?'color:var(--verde);font-weight:500':''}">${sg.piezaPat||'—'}</span></div>`+
+    (sg.piezaPat==='Sí'?
+      `<div class="dm-row"><span class="dm-lbl">Descripción</span><span>${sg.piezaDesc||'—'}</span></div>`+
+      `<div class="dm-row"><span class="dm-lbl">Destino</span><span>${sg.piezaDestino||'—'}</span></div>`+
+      `<div class="dm-row"><span class="dm-lbl">Patólogo / Lab.</span><span>${sg.piezaPatologo||'—'}</span></div>`
     :'')+
     (sg.motivo?`<div class="dm-row"><span class="dm-lbl">Motivo cancelación</span><span>${sg.motivo}</span></div>`:'')+
     `<div class="form-actions">
