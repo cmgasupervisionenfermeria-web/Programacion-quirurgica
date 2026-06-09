@@ -1104,34 +1104,38 @@ function renderConcentrado(){
   const pctCancel = programadas ? Math.round(canceladas.length/programadas*1000)/10 : 0;
 
   // ── 4. TIEMPO DE ROTACIÓN DE SALA ────────────────────────────────────────
-  // Mide el tiempo real entre el fin de una cirugía y el inicio de la siguiente
-  // en el mismo quirófano y el mismo día. El tiempo de limpieza (40 min) está
-  // INCLUIDO dentro del intervalo — no se resta. Un valor menor a 40 min
-  // indica que no hubo margen suficiente para la limpieza de la sala.
+  // Base: cirugías COMPLETADAS con hora real de inicio Y fin registradas.
+  // Mide el intervalo real entre el fin de una cirugía completada y el inicio
+  // real de la siguiente cirugía completada, en el mismo quirófano y día.
+  // El tiempo de limpieza (40 min) está INCLUIDO en el intervalo.
+  // Un valor < 40 min es una alerta: no hubo margen suficiente para limpieza.
   const LIMPIEZA = 40;
   const rotaciones = [];
   let paresInsuficientes = 0;
 
   const porSalaDia = {};
+  // Solo cirugías completadas con horaReal Y horaFin registradas
   realizadas.forEach(r => {
-    if (!r.horaFin) return;
+    if (!r.horaFin || !r.horaReal) return;
     const key = (r.qx || r.sala || '') + '|' + (r.fecha || r._fecha || '');
     if (!porSalaDia[key]) porSalaDia[key] = [];
     porSalaDia[key].push(r);
   });
 
   Object.values(porSalaDia).forEach(grupo => {
-    grupo.sort((a, b) => pH(a.hora) - pH(b.hora));
+    grupo.sort((a, b) => pH(a.horaReal) - pH(b.horaReal));
     for (let i = 0; i < grupo.length - 1; i++) {
       const finAnt = pH(grupo[i].horaFin);
-      const iniSig = pH(grupo[i + 1].horaReal || grupo[i + 1].hora);
-      const rot    = iniSig - finAnt;   // tiempo real entre cirugías (incluye limpieza)
+      const iniSig = pH(grupo[i + 1].horaReal);  // solo hora real, nunca programada
+      const rot    = iniSig - finAnt;
       if (rot > 0) {
         rotaciones.push(rot);
         if (rot < LIMPIEZA) paresInsuficientes++;
       }
     }
   });
+
+  const conHoraFinCompletas = realizadas.filter(r => r.horaFin && r.horaReal).length;
 
   const promRot = rotaciones.length
     ? Math.round(rotaciones.reduce((a, b) => a + b, 0) / rotaciones.length)
@@ -1219,14 +1223,14 @@ function renderConcentrado(){
     indCard(
       'var(--naranja2)', '🔄',
       'Tiempo de Rotación de Sala',
-      'promedio (min entre fin de cirugía anterior e inicio de la siguiente)',
+      'promedio (min entre fin e inicio real) · base: cirugías completadas con horas registradas',
       promRot !== null ? promRot + ' min' : 'N/D',
       rotaciones.length
-        ? `Promedio de ${rotaciones.length} par${rotaciones.length > 1 ? 'es' : ''} consecutivos · Tiempo de limpieza requerido: ${LIMPIEZA} min`
+        ? `${conHoraFinCompletas} de ${realizadas.length} cirugías completadas con horas registradas · ${rotaciones.length} par${rotaciones.length > 1 ? 'es' : ''} consecutivo${rotaciones.length > 1 ? 's' : ''} · Limpieza requerida: ${LIMPIEZA} min`
           + (paresInsuficientes > 0
               ? ` · ⚠ ${paresInsuficientes} par${paresInsuficientes > 1 ? 'es' : ''} con intervalo < ${LIMPIEZA} min`
               : ' · ✓ Todos los intervalos superan el tiempo de limpieza')
-        : 'Registra la hora real de fin para calcular este indicador',
+        : `${conHoraFinCompletas} de ${realizadas.length} cirugías completadas tienen hora inicio y fin registradas — captura ambas horas reales para calcular este indicador`,
       promRot !== null ? Math.min(promRot / 120 * 100, 100) : 0
     )+
     indCard(
