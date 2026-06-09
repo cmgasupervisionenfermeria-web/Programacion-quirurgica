@@ -1124,7 +1124,7 @@ function renderConcentrado(){
 
   // Intervalos > 240 min entre cirugías no son rotaciones reales (son huecos de
   // programación o cambios de jornada) y se descartan del promedio.
-  const MAX_ROT = 240;
+  const MAX_ROT = 60;
 
   Object.values(porSalaDia).forEach(grupo => {
     grupo.sort((a, b) => pH(a.horaReal) - pH(b.horaReal));
