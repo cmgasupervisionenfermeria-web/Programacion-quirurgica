@@ -1122,13 +1122,17 @@ function renderConcentrado(){
     porSalaDia[key].push(r);
   });
 
+  // Intervalos > 240 min entre cirugías no son rotaciones reales (son huecos de
+  // programación o cambios de jornada) y se descartan del promedio.
+  const MAX_ROT = 240;
+
   Object.values(porSalaDia).forEach(grupo => {
     grupo.sort((a, b) => pH(a.horaReal) - pH(b.horaReal));
     for (let i = 0; i < grupo.length - 1; i++) {
       const finAnt = pH(grupo[i].horaFin);
-      const iniSig = pH(grupo[i + 1].horaReal);  // solo hora real, nunca programada
+      const iniSig = pH(grupo[i + 1].horaReal);
       const rot    = iniSig - finAnt;
-      if (rot > 0) {
+      if (rot > 0 && rot <= MAX_ROT) {
         rotaciones.push(rot);
         if (rot < LIMPIEZA) paresInsuficientes++;
       }
@@ -1222,16 +1226,16 @@ function renderConcentrado(){
     )+
     indCard(
       'var(--naranja2)', '🔄',
-      'Tiempo de Rotación de Sala',
-      'promedio (min entre fin e inicio real) · base: cirugías completadas con horas registradas',
+      'Índice de Rotación de Sala',
+      'minutos promedio entre el fin de una cirugía y el inicio real de la siguiente · misma sala · mismo día',
       promRot !== null ? promRot + ' min' : 'N/D',
       rotaciones.length
-        ? `${conHoraFinCompletas} de ${realizadas.length} cirugías completadas con horas registradas · ${rotaciones.length} par${rotaciones.length > 1 ? 'es' : ''} consecutivo${rotaciones.length > 1 ? 's' : ''} · Limpieza requerida: ${LIMPIEZA} min`
+        ? `Base: ${conHoraFinCompletas} cirugías completadas con horas registradas (de ${realizadas.length} completadas) · ${rotaciones.length} transición${rotaciones.length > 1 ? 'es' : ''} válida${rotaciones.length > 1 ? 's' : ''}`
           + (paresInsuficientes > 0
-              ? ` · ⚠ ${paresInsuficientes} par${paresInsuficientes > 1 ? 'es' : ''} con intervalo < ${LIMPIEZA} min`
-              : ' · ✓ Todos los intervalos superan el tiempo de limpieza')
-        : `${conHoraFinCompletas} de ${realizadas.length} cirugías completadas tienen hora inicio y fin registradas — captura ambas horas reales para calcular este indicador`,
-      promRot !== null ? Math.min(promRot / 120 * 100, 100) : 0
+              ? ` · ⚠ ${paresInsuficientes} transición${paresInsuficientes > 1 ? 'es' : ''} con < ${LIMPIEZA} min (sin margen de limpieza)`
+              : ` · ✓ Todas las transiciones superan los ${LIMPIEZA} min de limpieza requeridos`)
+        : `Sin transiciones calculables — se requieren cirugías completadas con hora real de inicio y fin en la misma sala y día`,
+      promRot !== null ? Math.min(promRot / MAX_ROT * 100, 100) : 0
     )+
     indCard(
       'var(--morado)', '🔁',
