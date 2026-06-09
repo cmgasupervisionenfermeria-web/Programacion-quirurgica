@@ -162,7 +162,6 @@ tbody tr:last-child{border-bottom:none}
 .toast.success{background:var(--verde)}
 .toast.error{background:var(--rojo)}
 .install-bar{background:var(--az3);border:1px solid #B5D4F4;border-radius:var(--r);padding:10px 14px;margin-bottom:14px;display:flex;align-items:center;gap:10px;font-size:13px;color:#1E3A5F}
-/* Chip duración real */
 .dur-real-chip{display:inline-flex;align-items:center;gap:4px;background:var(--verde3);color:var(--verde);border-radius:99px;padding:2px 9px;font-size:11px;font-weight:500;margin-left:6px}
 @media(max-width:700px){
 .stats-row,.stats-grid-4{grid-template-columns:repeat(3,1fr)}
@@ -186,7 +185,6 @@ tbody tr:last-child{border-bottom:none}
 </div>
 </nav>
 
-<!-- PIN MODAL -->
 <div id="pinModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);display:none;align-items:center;justify-content:center;z-index:500">
 <div style="background:#fff;border-radius:16px;padding:28px 24px;width:100%;max-width:320px;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,.3)">
 <div style="font-size:36px;margin-bottom:10px">🔐</div>
@@ -202,7 +200,6 @@ style="width:100%;padding:12px;font-size:20px;text-align:center;border:2px solid
 </div>
 </div>
 
-<!-- ═══════════════ POR DÍA ═══════════════ -->
 <div class="page active" id="page-dia">
 <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:14px">
 <div class="date-nav" style="margin:0">
@@ -242,7 +239,6 @@ style="width:100%;padding:12px;font-size:20px;text-align:center;border:2px solid
 <div id="viewCards" style="display:none"><div class="cards-list" id="cardsList"></div></div>
 </div>
 
-<!-- ═══════════════ REGISTRO ═══════════════ -->
 <div class="page" id="page-registro">
 <div class="page-hdr">
 <div><h1>Registrar Cirugía</h1><p>Llena el formulario y guarda en la base de datos</p></div>
@@ -268,13 +264,11 @@ style="width:100%;padding:12px;font-size:20px;text-align:center;border:2px solid
 style="background:var(--gris1);color:var(--gris5);cursor:default">
 </div>
 </div>
-
 <div class="section-lbl">Paciente</div>
 <div class="form-grid">
 <div class="form-group"><label>N° Expediente <span style="color:var(--gris4);font-weight:400;text-transform:none;font-size:10px">(opcional)</span></label><input type="text" id="f-expediente" placeholder="EXP-001"></div>
 <div class="form-group"><label>Nombre del Paciente</label><input type="text" id="f-paciente" placeholder="Apellidos, Nombre"></div>
 </div>
-
 <div class="section-lbl">Procedimiento y equipo</div>
 <div class="form-cw" id="form-cw"></div>
 <div class="form-grid">
@@ -298,7 +292,6 @@ style="background:var(--gris1);color:var(--gris5);cursor:default">
 <select id="f-estatus" onchange="toggleCancel()"><option value="">— Selecciona —</option><option>Pendiente</option><option>En curso</option><option>Completada</option><option>Cancelada</option><option>Suspendida</option><option>Fallecimiento</option></select>
 </div>
 </div>
-
 <div class="section-lbl">Indicadores de calidad</div>
 <div class="form-grid">
 <div class="form-group"><label>Hoja de Cirugía Segura</label>
@@ -312,14 +305,12 @@ style="background:var(--gris1);color:var(--gris5);cursor:default">
 <input type="text" id="f-evento-adverso-desc" placeholder="Describa el evento adverso ocurrido">
 </div>
 </div>
-
 <div class="section-lbl">Insumos</div>
 <div class="form-grid">
 <div class="form-group"><label>Insumos / Material</label><input type="text" id="f-insumos"></div>
 <div class="form-group"><label>Proveedor</label><input type="text" id="f-proveedor"></div>
 <div class="form-group"><label>Personal que Programa</label><input type="text" id="f-personal"></div>
 </div>
-
 <div class="section-lbl">Pieza Patológica</div>
 <div class="form-grid">
 <div class="form-group"><label>¿Hubo pieza patológica?</label>
@@ -338,7 +329,6 @@ style="background:var(--gris1);color:var(--gris5);cursor:default">
 <input type="text" id="f-pieza-patologo" placeholder="Nombre del patólogo o laboratorio">
 </div>
 </div>
-
 <div class="cancel-sec" id="cancel-sec">
 <p>⚠ Cancelación / Suspensión</p>
 <div class="form-grid">
@@ -346,7 +336,6 @@ style="background:var(--gris1);color:var(--gris5);cursor:default">
 <div class="form-group"><label>Personal que Cancela</label><input type="text" id="f-personal-cancel"></div>
 </div>
 </div>
-
 <div class="form-actions">
 <button class="btn btn-ghost" onclick="limpiarForm()">Limpiar</button>
 <button class="btn btn-success" onclick="guardarCirugia()">✓ Guardar cirugía</button>
@@ -355,7 +344,6 @@ style="background:var(--gris1);color:var(--gris5);cursor:default">
 </div>
 </div>
 
-<!-- ═══════════════ BASE DE DATOS ═══════════════ -->
 <div class="page" id="page-base">
 <div class="page-hdr">
 <div><h1>Base de Datos</h1><p><span id="total-reg">0</span> registros totales</p></div>
@@ -388,7 +376,6 @@ style="background:var(--gris1);color:var(--gris5);cursor:default">
 </div>
 </div>
 
-<!-- ═══════════════ CONCENTRADO ═══════════════ -->
 <div class="page" id="page-concentrado">
 <div class="page-hdr">
 <div><h1>Concentrado Mensual</h1><p>Indicadores calculados desde la base de datos</p></div>
@@ -405,26 +392,21 @@ style="background:var(--gris1);color:var(--gris5);cursor:default">
 </div>
 </div>
 <div class="stats-grid-4" id="stats-grid"></div>
-<!-- 5 indicadores en grid -->
 <div id="ind-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:12px"></div>
 </div>
 
-<!-- MODAL -->
 <div class="modal-bg" id="modalBg" style="display:none" onclick="if(event.target===this)closeModal()">
 <div class="modal"><div class="modal-handle"></div><div id="modalContent"></div></div>
 </div>
-
 <div class="toast" id="toast"></div>
 
 <script>
-// ── CONSTANTES ────────────────────────────────────────────────────────────────
 const GAS_URL = 'https://script.google.com/macros/s/AKfycbwyQdQl-QuUcek0m7_8BvGAPU9kyIqkwxuaFLvh3K--u8xUGLqlXA-ev78sbyBixuK3NA/exec';
 const PIN_CORRECTO = 'QXCMG1';
 const QXS = ['Quirófano 1','Quirófano 2','Quirófano 3'];
 const ESTADOS = ['Pendiente','En curso','Completada','Cancelada'];
 const SH = 32;
 
-// ── DATOS CLOUD ───────────────────────────────────────────────────────────────
 let diaDB = {}, DB = [];
 let nid = 1;
 let pinDesbloqueado = false;
@@ -438,7 +420,6 @@ function dk(d){
 function gS(){ return diaDB[dk(cur)]||[] }
 function sS(a){ diaDB[dk(cur)]=a; }
 
-// ── API ────────────────────────────────────────────────────────────────────────
 function showLoader(m){ let el=document.getElementById('loaderBar'); if(!el){el=document.createElement('div');el.id='loaderBar';el.style.cssText='position:fixed;top:54px;left:0;right:0;background:#2563A8;color:#fff;text-align:center;padding:6px;font-size:12px;z-index:300';document.body.appendChild(el);} el.textContent=m;el.style.display='block'; }
 function hideLoader(){ const el=document.getElementById('loaderBar'); if(el) el.style.display='none'; }
 
@@ -477,10 +458,9 @@ async function cargarDatos(){
       r.hora = fixHora(r.hora);
       r.horaReal = fixHora(r.horaReal);
       r.horaFin  = fixHora(r.horaFin);
-      // Recalcular duración real si hay hora inicio y fin
       if(r.horaReal && r.horaFin){
         let dr = pH(r.horaFin) - pH(r.horaReal);
-        if(dr < 0) dr += 1440; // cruce de medianoche
+        if(dr < 0) dr += 1440;
         if(dr > 0) r.duracionReal = dr;
       }
       const f=r.fecha||r._fecha;
@@ -496,7 +476,6 @@ async function cargarDatos(){
 function saveDia(){}
 function saveDB(){}
 
-// ── PIN ────────────────────────────────────────────────────────────────────────
 function requirePin(cb){
   if(pinDesbloqueado){ cb(); return; }
   pinCallback=cb;
@@ -532,7 +511,6 @@ function toggleLock(){
   } else { requirePin(()=>{}); }
 }
 
-// ── HORAS ─────────────────────────────────────────────────────────────────────
 const HORAS30 = Array.from({length:48},(_,i)=>String(Math.floor(i/2)).padStart(2,'0')+':'+(i%2?'30':'00'));
 const HORAS_H = Array.from({length:24},(_,i)=>String(i).padStart(2,'0')+':00');
 
@@ -543,7 +521,6 @@ function fillSel(id, opts, blank='— Selecciona —'){
 }
 fillSel('f-hora', HORAS30);
 
-// ── CÁLCULO DURACIÓN REAL ─────────────────────────────────────────────────────
 function calcDuracionReal(){
   const ini = document.getElementById('f-hora-real').value;
   const fin = document.getElementById('f-hora-fin').value;
@@ -567,7 +544,6 @@ function calcDuracionReal(){
   }
 }
 
-// ── NAVEGACIÓN ────────────────────────────────────────────────────────────────
 function showPage(id, btn){
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
   document.querySelectorAll('.nav-tab').forEach(t=>t.classList.remove('active'));
@@ -578,7 +554,6 @@ function showPage(id, btn){
   if(id==='dia') render();
 }
 
-// ── UTILS ─────────────────────────────────────────────────────────────────────
 function pH(h){ if(!h)return 0; const p=h.split(':').map(Number); return p[0]*60+(p[1]||0); }
 function fmt(d){
   const days=['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'];
@@ -592,7 +567,6 @@ function toast(msg,tipo='success'){
 }
 function closeModal(){ document.getElementById('modalBg').style.display='none'; }
 
-// ── TRASLAPES ─────────────────────────────────────────────────────────────────
 function dC(s){
   const cf=new Set(), ac=s.filter(x=>x.estado!=='cancelada'&&x.estado!=='Cancelada');
   for(let i=0;i<ac.length;i++) for(let j=i+1;j<ac.length;j++){
@@ -608,7 +582,6 @@ function dCFor(s,eid,hora,dur,qx,est){
   return s.filter(o=>o.id!==eid&&o.qx===qx&&o.estado!=='cancelada'&&o.estado!=='Cancelada'&&sT<pH(o.hora)+o.duracion&&pH(o.hora)<eT);
 }
 
-// ── BADGE ─────────────────────────────────────────────────────────────────────
 function badgeEst(e){
   const m={pendiente:'pendiente','en-curso':'en-curso',completada:'completada',cancelada:'cancelada',suspendida:'suspendida',
     'Pendiente':'pendiente','En curso':'en-curso','Completada':'completada','Cancelada':'cancelada','Suspendida':'suspendida',
@@ -617,7 +590,6 @@ function badgeEst(e){
   return `<span class="badge b-${cl}">${e||'—'}</span>`;
 }
 
-// ── RENDER BANNER ─────────────────────────────────────────────────────────────
 function rBanner(s,cf){
   const el=document.getElementById('alertBanner');
   if(!cf.size){el.innerHTML='';return}
@@ -630,7 +602,6 @@ function rBanner(s,cf){
   el.innerHTML='<div class="alert-banner"><span class="alert-icon">⚠️</span><div><div class="alert-title">'+pairs.length+' traslape'+(pairs.length>1?'s':'')+' detectado'+(pairs.length>1?'s':'')+'</div>'+pairs.map(p=>'<div class="alert-item">· <b>'+p.a.qx+'</b>: '+p.a.paciente.split(',')[0]+' ('+p.a.hora+') y '+p.b.paciente.split(',')[0]+' ('+p.b.hora+')</div>').join('')+'</div></div>';
 }
 
-// ── RENDER STATS ──────────────────────────────────────────────────────────────
 function rStats(s,cf){
   const c={pendiente:0,'en-curso':0,completada:0,cancelada:0};
   s.forEach(x=>{const k=(x.estado||'').toLowerCase().replace(' ','-');c[k]=(c[k]||0)+1});
@@ -644,7 +615,6 @@ function rStats(s,cf){
     `<div class="stat"><div class="stat-lbl">Traslapes</div><div class="stat-val c-rojo">${nc}</div></div>`;
 }
 
-// ── RENDER TIMELINE ───────────────────────────────────────────────────────────
 function rTL(s,cf){
   const tot=48*SH;
   let hrs='';
@@ -670,7 +640,6 @@ function rTL(s,cf){
   setTimeout(()=>{ const w=document.getElementById('tlW'); if(w)w.scrollTop=7*2*SH; },50);
 }
 
-// ── RENDER CARDS ──────────────────────────────────────────────────────────────
 function rCards(s,cf){
   const el=document.getElementById('cardsList');
   if(!s.length){el.innerHTML='<div class="empty"><div class="empty-icon">📅</div><p>Sin cirugías programadas para este día</p></div>';return}
@@ -694,7 +663,6 @@ function rCards(s,cf){
   }).join('');
 }
 
-// ── RENDER PRINCIPAL ──────────────────────────────────────────────────────────
 function render(){
   document.getElementById('dateLabel').textContent=fmt(cur);
   const s=gS(), cf=dC(s);
@@ -707,7 +675,6 @@ function switchView(v){
   document.getElementById('tabCards').classList.toggle('active',v==='cards');
 }
 
-// ── DETALLE ───────────────────────────────────────────────────────────────────
 function openDetail(id){
   const sg=gS().find(x=>x.id===id); if(!sg) return;
   const cf=dC(gS()),isc=cf.has(sg.id);
@@ -717,7 +684,6 @@ function openDetail(id){
   const durRealHTML = sg.duracionReal
     ? `<span class="dur-real-chip">✓ ${sg.duracionReal} min reales</span>`
     : '<span style="color:var(--gris4);font-size:12px">—</span>';
-
   document.getElementById('modalContent').innerHTML=
     `<div class="modal-title">${sg.paciente||'Sin nombre'}<button class="modal-close" onclick="closeModal()">×</button></div>`+
     (isc&&others.length?`<div class="conflict-warn">⚠ Traslape con: ${others.map(o=>o.paciente.split(',')[0]+' ('+o.hora+')').join(', ')}</div>`:'')+
@@ -784,7 +750,6 @@ async function guardarEnDB(id){
   hideLoader(); closeModal();
 }
 
-// ── EDITAR ────────────────────────────────────────────────────────────────────
 function openEdit(id){ openForm(gS().find(x=>x.id===id)||{}); }
 
 function openForm(sg){
@@ -792,7 +757,6 @@ function openForm(sg){
   const hOpts=HORAS30.map(h=>`<option value="${h}"${sg.hora===h?' selected':''}>${h}</option>`).join('');
   const latOpts=['','N/A','Derecha','Izquierda','Bilateral'].map(l=>`<option value="${l}"${sg.lateralidad===l?' selected':''}>${l||'— Selecciona —'}</option>`).join('');
   const durR = sg.duracionReal || '';
-
   document.getElementById('modalContent').innerHTML=
     `<div class="modal-title">${isN?'Nueva cirugía':'Editar cirugía'}<button class="modal-close" onclick="closeModal()">×</button></div>`+
     `<div class="form-cw" id="ecw"></div>`+
@@ -876,7 +840,6 @@ async function saveFrm(id){
   const fin = document.getElementById('ehf').value;
   let durReal = null;
   if(ini && fin){ const d = pH(fin)-pH(ini); if(d>0) durReal=d; }
-
   const d={
     id:id||nid++,
     fecha:dk(cur), _fecha:dk(cur),
@@ -916,7 +879,6 @@ async function saveFrm(id){
   hideLoader(); closeModal(); render();
 }
 
-// ── FORMULARIO REGISTRO ───────────────────────────────────────────────────────
 const hoy=new Date().toISOString().split('T')[0];
 document.getElementById('f-fecha').value=hoy;
 
@@ -924,7 +886,6 @@ function toggleCancel(){
   const est=document.getElementById('f-estatus').value;
   document.getElementById('cancel-sec').classList.toggle('show',est==='Cancelada'||est==='Suspendida');
 }
-
 function togglePiezaPat(){
   const val=document.getElementById('f-pieza-pat').value;
   const show = val==='Sí';
@@ -932,7 +893,6 @@ function togglePiezaPat(){
   document.getElementById('pieza-destino-wrap').style.display=show?'block':'none';
   document.getElementById('pieza-patologo-wrap').style.display=show?'block':'none';
 }
-
 function togglePiezaPatModal(){
   const val=document.getElementById('epiezapat').value;
   const show=val==='Sí';
@@ -940,12 +900,10 @@ function togglePiezaPatModal(){
   document.getElementById('epiezadestino-wrap').style.display=show?'flex':'none';
   document.getElementById('epiezapatologo-wrap').style.display=show?'flex':'none';
 }
-
 function toggleEventoAdverso(){
   const val=document.getElementById('f-evento-adverso').value;
   document.getElementById('evento-adverso-desc-wrap').style.display=val==='Sí'?'block':'none';
 }
-
 function limpiarForm(){
   ['f-sala','f-tipo','f-hora','f-hora-real','f-hora-fin','f-lateralidad','f-expediente','f-paciente',
    'f-procedimiento','f-especialidad','f-cirujano','f-anestesiologo','f-instrumentista','f-estatus',
@@ -978,7 +936,6 @@ function guardarCirugia(){
   const fin = document.getElementById('f-hora-fin').value;
   let durReal = null;
   if(ini && fin){ const d = pH(fin)-pH(ini); if(d>0) durReal=d; }
-
   const rec={
     id:nid++,
     fecha:document.getElementById('f-fecha').value,
@@ -1029,7 +986,6 @@ function guardarCirugia(){
   render();
 }
 
-// ── BASE DE DATOS ─────────────────────────────────────────────────────────────
 function esRein(exp){ return exp&&DB.filter(r=>r.expediente===exp).length>1; }
 
 function renderTabla(){
@@ -1043,7 +999,6 @@ function renderTabla(){
     (!fe||r.estado===fe)&&
     (!fb||(r.expediente||'').toLowerCase().includes(fb)||(r.paciente||'').toLowerCase().includes(fb))
   ).sort((a,b)=>(a.fecha||a._fecha||'').localeCompare(b.fecha||b._fecha||'')||a.hora.localeCompare(b.hora));
-
   document.getElementById('total-reg').textContent=DB.length;
   const tbody=document.getElementById('tabla-body');
   const empty=document.getElementById('tabla-empty');
@@ -1114,7 +1069,6 @@ function renderConcentrado(){
   const mes=parseInt(document.getElementById('con-mes').value);
   const anio=parseInt(document.getElementById('con-anio').value);
 
-  // Recolectar todos los registros del mes
   const allRecs=[];
   Object.entries(diaDB).forEach(([fecha,arr])=>{
     const d=new Date(fecha+'T12:00');
@@ -1131,81 +1085,81 @@ function renderConcentrado(){
   const realizadas  = allRecs.filter(r=>{const e=(r.estado||'').toLowerCase();return e==='completada'||e==='realizada';});
   const canceladas  = allRecs.filter(r=>(r.estado||'').toLowerCase()==='cancelada');
 
-  // Días únicos del mes con al menos una cirugía
   const diasUnicos = [...new Set(allRecs.map(r=>r.fecha||r._fecha).filter(Boolean))];
   const numDias    = diasUnicos.length || 1;
 
-  // ─── 1. UTILIZACIÓN DE QUIRÓFANO ─────────────────────────────────────────
-  // (horas utilizadas / horas disponibles) × 100
-  // Horas disponibles = 24h × 3 quirófanos × días con actividad del mes
+  // ── 1. UTILIZACIÓN DE QUIRÓFANO ──────────────────────────────────────────
   const totalMinUsados = realizadas.reduce((s,r)=>s+(r.duracionReal||r.duracion||0),0);
   const minDisponibles = 24*60 * 3 * numDias;
   const pctUtil = minDisponibles ? Math.round(totalMinUsados/minDisponibles*1000)/10 : 0;
 
-  // ─── 2. INICIO PUNTUAL ────────────────────────────────────────────────────
-  // (cirugías iniciadas en horario / total programadas) × 100
-  // "En horario" = horaReal <= horaProgramada
+  // ── 2. INICIO PUNTUAL ────────────────────────────────────────────────────
   const conHoraReal = allRecs.filter(r=>r.hora&&r.horaReal);
   const puntuales   = conHoraReal.filter(r=>pH(r.horaReal)<=pH(r.hora)).length;
   const pctPuntual  = conHoraReal.length ? Math.round(puntuales/conHoraReal.length*1000)/10 : null;
   const retrasos    = conHoraReal.map(r=>Math.max(0,pH(r.horaReal)-pH(r.hora))).filter(d=>d>0);
   const promRet     = retrasos.length ? Math.round(retrasos.reduce((a,b)=>a+b,0)/retrasos.length) : 0;
 
-  // ─── 3. CANCELACIÓN QUIRÚRGICA ────────────────────────────────────────────
-  // (canceladas / programadas) × 100
+  // ── 3. CANCELACIÓN QUIRÚRGICA ────────────────────────────────────────────
   const pctCancel = programadas ? Math.round(canceladas.length/programadas*1000)/10 : 0;
 
-  // ─── 4. TIEMPO DE ROTACIÓN DE SALA ───────────────────────────────────────
-  // Promedio de (inicio_sig - fin_ant - 40 min limpieza)
-  // Solo pares consecutivos en el mismo quirófano y mismo día con hora fin registrada
+  // ── 4. TIEMPO DE ROTACIÓN DE SALA ────────────────────────────────────────
+  // Mide el tiempo real entre el fin de una cirugía y el inicio de la siguiente
+  // en el mismo quirófano y el mismo día. El tiempo de limpieza (40 min) está
+  // INCLUIDO dentro del intervalo — no se resta. Un valor menor a 40 min
+  // indica que no hubo margen suficiente para la limpieza de la sala.
   const LIMPIEZA = 40;
   const rotaciones = [];
-  // Agrupar por sala y día
+  let paresInsuficientes = 0;
+
   const porSalaDia = {};
-  realizadas.forEach(r=>{
-    if(!r.horaFin) return;
-    const key=(r.qx||r.sala||'')+'|'+(r.fecha||r._fecha||'');
-    if(!porSalaDia[key]) porSalaDia[key]=[];
+  realizadas.forEach(r => {
+    if (!r.horaFin) return;
+    const key = (r.qx || r.sala || '') + '|' + (r.fecha || r._fecha || '');
+    if (!porSalaDia[key]) porSalaDia[key] = [];
     porSalaDia[key].push(r);
   });
-  Object.values(porSalaDia).forEach(grupo=>{
-    // Ordenar por hora de inicio
-    grupo.sort((a,b)=>pH(a.hora)-pH(b.hora));
-    for(let i=0;i<grupo.length-1;i++){
-      const finAnt  = pH(grupo[i].horaFin);
-      const iniSig  = pH(grupo[i+1].horaReal||grupo[i+1].hora);
-      const rot     = iniSig - finAnt - LIMPIEZA;
-      if(rot>=0) rotaciones.push(rot);
+
+  Object.values(porSalaDia).forEach(grupo => {
+    grupo.sort((a, b) => pH(a.hora) - pH(b.hora));
+    for (let i = 0; i < grupo.length - 1; i++) {
+      const finAnt = pH(grupo[i].horaFin);
+      const iniSig = pH(grupo[i + 1].horaReal || grupo[i + 1].hora);
+      const rot    = iniSig - finAnt;   // tiempo real entre cirugías (incluye limpieza)
+      if (rot > 0) {
+        rotaciones.push(rot);
+        if (rot < LIMPIEZA) paresInsuficientes++;
+      }
     }
   });
-  const promRot = rotaciones.length ? Math.round(rotaciones.reduce((a,b)=>a+b,0)/rotaciones.length) : null;
 
-  // ─── 5. REINTERVENCIONES ─────────────────────────────────────────────────
-  // (reintervenciones / total cirugías) × 100
-  // Expediente que aparece más de una vez en todo el historial
+  const promRot = rotaciones.length
+    ? Math.round(rotaciones.reduce((a, b) => a + b, 0) / rotaciones.length)
+    : null;
+
+  // ── 5. REINTERVENCIONES ──────────────────────────────────────────────────
   const expMes = [...new Set(allRecs.map(r=>r.expediente).filter(Boolean))];
   const reinCount = expMes.filter(exp=>DB.filter(r=>r.expediente===exp).length>1).length;
   const pctRein = programadas ? Math.round(reinCount/programadas*1000)/10 : 0;
 
-  // ─── MORTALIDAD ───────────────────────────────────────────────────────────
+  // ── MORTALIDAD ───────────────────────────────────────────────────────────
   const fallecimientos = allRecs.filter(r=>(r.estado||'').toLowerCase()==='fallecimiento');
   const pctMortalidad  = programadas ? Math.round(fallecimientos.length/programadas*1000)/10 : 0;
 
-  // ─── CIRUGÍA SEGURA ───────────────────────────────────────────────────────
+  // ── CIRUGÍA SEGURA ───────────────────────────────────────────────────────
   const conCirSegura    = allRecs.filter(r=>r.cirugiaSegura&&r.cirugiaSegura!=='');
   const cirSeguraCompl  = allRecs.filter(r=>r.cirugiaSegura==='Completa');
   const pctCirSegura    = conCirSegura.length ? Math.round(cirSeguraCompl.length/conCirSegura.length*1000)/10 : null;
 
-  // ─── EVENTO ADVERSO ───────────────────────────────────────────────────────
+  // ── EVENTO ADVERSO ───────────────────────────────────────────────────────
   const eventosAdversos = allRecs.filter(r=>r.eventoAdverso==='Sí');
   const pctEventos      = programadas ? Math.round(eventosAdversos.length/programadas*1000)/10 : 0;
 
-  // ─── TIPO DE CIRUGÍA ──────────────────────────────────────────────────────
+  // ── TIPO DE CIRUGÍA ──────────────────────────────────────────────────────
   const porTipo = {};
   allRecs.forEach(r=>{ const t=r.tipoQx||'Sin clasificar'; porTipo[t]=(porTipo[t]||0)+1; });
-  const tipoResumen = Object.entries(porTipo).map(([t,n])=>`${t}: ${n} (${Math.round(n/programadas*100)}%)`).join(' · ');
 
-  // ─── ESPECIALIDAD Y CIRUJANO MÁS FRECUENTE ────────────────────────────────
+  // ── ESPECIALIDAD Y CIRUJANO ──────────────────────────────────────────────
   const porEsp={}, porCir={};
   allRecs.forEach(r=>{
     if(r.especialidad){ porEsp[r.especialidad]=(porEsp[r.especialidad]||0)+1; }
@@ -1217,14 +1171,13 @@ function renderConcentrado(){
   const cirFrec = topCir.length ? topCir[0] : null;
   const promDiario = numDias ? Math.round(programadas/numDias*10)/10 : 0;
 
-  // ─── TARJETAS RESUMEN ─────────────────────────────────────────────────────
+  // ── TARJETAS RESUMEN ─────────────────────────────────────────────────────
   document.getElementById('stats-grid').innerHTML=
     `<div class="stat-card"><div class="stat-card-lbl">Cirugías en el mes</div><div class="stat-card-val c-az">${programadas}</div><div class="stat-card-sub">total programadas</div></div>`+
     `<div class="stat-card"><div class="stat-card-lbl">Promedio diario</div><div class="stat-card-val c-az">${promDiario}</div><div class="stat-card-sub">cirugías por día activo</div></div>`+
     `<div class="stat-card"><div class="stat-card-lbl">Completadas</div><div class="stat-card-val c-verde">${realizadas.length}</div><div class="stat-card-sub">${programadas?Math.round(realizadas.length/programadas*100):0}% del total</div></div>`+
     `<div class="stat-card"><div class="stat-card-lbl">Canceladas</div><div class="stat-card-val c-rojo">${canceladas.length}</div><div class="stat-card-sub">${pctCancel}% del total</div></div>`;
 
-  // ─── CARDS DE INDICADORES ─────────────────────────────────────────────────
   function indCard(color, emoji, titulo, formula, valor, desc, barVal){
     const pct = Math.min(barVal??0, 100);
     return `<div class="ind-card">
@@ -1246,7 +1199,7 @@ function renderConcentrado(){
       pctUtil
     )+
     indCard(
-      'var(--verde)',  '🕑',
+      'var(--verde)', '🕑',
       'Inicio Puntual de Cirugía',
       '(iniciadas en horario / total programadas) × 100',
       pctPuntual!==null ? pctPuntual+'%' : 'N/D',
@@ -1266,12 +1219,15 @@ function renderConcentrado(){
     indCard(
       'var(--naranja2)', '🔄',
       'Tiempo de Rotación de Sala',
-      'promedio de min entre cirugías (descontando 40 min limpieza)',
-      promRot!==null ? promRot+' min' : 'N/D',
+      'promedio (min entre fin de cirugía anterior e inicio de la siguiente)',
+      promRot !== null ? promRot + ' min' : 'N/D',
       rotaciones.length
-        ? `Calculado sobre ${rotaciones.length} par${rotaciones.length>1?'es':''} de cirugías consecutivas con hora fin registrada`
+        ? `Promedio de ${rotaciones.length} par${rotaciones.length > 1 ? 'es' : ''} consecutivos · Tiempo de limpieza requerido: ${LIMPIEZA} min`
+          + (paresInsuficientes > 0
+              ? ` · ⚠ ${paresInsuficientes} par${paresInsuficientes > 1 ? 'es' : ''} con intervalo < ${LIMPIEZA} min`
+              : ' · ✓ Todos los intervalos superan el tiempo de limpieza')
         : 'Registra la hora real de fin para calcular este indicador',
-      promRot!==null ? Math.min(promRot/120*100,100) : 0
+      promRot !== null ? Math.min(promRot / 120 * 100, 100) : 0
     )+
     indCard(
       'var(--morado)', '🔁',
@@ -1355,14 +1311,12 @@ function renderConcentrado(){
       : '');
 }
 
-// ── NAVEGACIÓN POR DÍA ────────────────────────────────────────────────────────
 document.getElementById('prevDay').onclick=()=>{cur.setDate(cur.getDate()-1);render()};
 document.getElementById('nextDay').onclick=()=>{cur.setDate(cur.getDate()+1);render()};
 document.getElementById('btnNueva').onclick=()=>{
   requirePin(()=>{ showPage('registro',null); document.querySelector('[onclick="showPage(\'registro\',this)"]')?.classList.add('active'); });
 };
 
-// ── INIT ──────────────────────────────────────────────────────────────────────
 render();
 cargarDatos();
 </script>
