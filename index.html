@@ -277,6 +277,7 @@ style="background:var(--gris1);color:var(--gris5);cursor:default">
 <select id="f-especialidad">
 <option value="">— Selecciona —</option>
 <option>Cirugía General</option>
+<option>Cirugía Oncológica</option>
 <option>Ortopedia y Traumatología</option>
 <option>Ginecología y Obstetricia</option>
 <option>Urología</option>
@@ -823,7 +824,7 @@ function openForm(sg){
       <div class="form-group"><label>Hora real inicio</label><input type="time" id="ehr" value="${sg.horaReal||''}" onchange="calcDuracionRealModal()" style="font-family:'DM Mono',monospace"></div>
       <div class="form-group"><label>Hora real fin</label><input type="time" id="ehf" value="${sg.horaFin||''}" onchange="calcDuracionRealModal()" style="font-family:'DM Mono',monospace"></div>
       <div class="form-group"><label>Duración real (min)</label><input id="edurreal" type="number" value="${durR}" readonly style="background:var(--gris1);color:var(--verde);font-weight:600;cursor:default" placeholder="Calculada automáticamente"></div>
-      <div class="form-group"><label>Especialidad</label><select id="eesp">${['','Cirugía General','Ortopedia y Traumatología','Ginecología y Obstetricia','Urología','Neurocirugía','Cirugía Plástica','Oftalmología','Otorrinolaringología','Cardiocirugía','Cirugía Vascular','Gastroenterología','Pediatría Quirúrgica'].map(e=>`<option value="${e}"${sg.especialidad===e?' selected':''}>${e||'— Selecciona —'}</option>`).join('')}</select></div>
+      <div class="form-group"><label>Especialidad</label><select id="eesp">${['','Cirugía General','Cirugía Oncológica','Ortopedia y Traumatología','Ginecología y Obstetricia','Urología','Neurocirugía','Cirugía Plástica','Oftalmología','Otorrinolaringología','Cardiocirugía','Cirugía Vascular','Gastroenterología','Pediatría Quirúrgica'].map(e=>`<option value="${e}"${sg.especialidad===e?' selected':''}>${e||'— Selecciona —'}</option>`).join('')}</select></div>
       <div class="form-group"><label>Lateralidad</label><select id="elat">${latOpts}</select></div>
       <div class="form-group"><label>N° Expediente</label><input id="eexp" value="${sg.expediente||''}"></div>
       <div class="form-group full"><label>Paciente</label><input id="ep" value="${sg.paciente||''}"></div>
@@ -1497,4 +1498,3 @@ cargarDatos();
 </script>
 </body>
 </html>
-                                               
