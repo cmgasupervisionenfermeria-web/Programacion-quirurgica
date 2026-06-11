@@ -1391,12 +1391,20 @@ document.getElementById('btnNueva').onclick=()=>{
   requirePin(()=>{ showPage('registro',null); document.querySelector('[onclick="showPage(\'registro\',this)"]')?.classList.add('active'); });
 };
 
-// ── CATÁLOGO DINÁMICO DE CIRUJANOS ───────────────────────────────────────────
-// El catálogo se guarda en localStorage. Cuando se registra un cirujano nuevo
-// se añade automáticamente; los siguientes registros solo pueden elegirlo del
-// desplegable, garantizando consistencia en el concentrado.
+// ── CATÁLOGO DE CIRUJANOS — siempre desde Google Sheets ─────────────────────
+// Al cargar la app se reconstruye el catálogo EXCLUSIVAMENTE desde los datos
+// de Sheets, normalizando nombres (trim + título) para eliminar duplicados
+// por mayúsculas/minúsculas. El localStorage se limpia y reemplaza en cada
+// sincronización para evitar acumulación de variantes incorrectas.
 
-const CAT_KEY = 'cmga_cirujanos_v1';
+const CAT_KEY = 'cmga_cirujanos_v2'; // v2 para limpiar la caché anterior
+
+function normalizarNombre(n){
+  // "dr. antonio cruz" → "Dr. Antonio Cruz"
+  return (n||'').trim().replace(/\s+/g,' ')
+    .toLowerCase()
+    .replace(/(^|\s)\S/g, c => c.toUpperCase());
+}
 
 function getCatalogoCirujanos(){
   try { return JSON.parse(localStorage.getItem(CAT_KEY)) || []; }
@@ -1404,9 +1412,10 @@ function getCatalogoCirujanos(){
 }
 
 function saveCatalogoCirujanos(arr){
-  // Ordenar alfabéticamente antes de guardar
   arr.sort((a,b) => a.localeCompare(b, 'es', {sensitivity:'base'}));
   localStorage.setItem(CAT_KEY, JSON.stringify(arr));
+  // Limpiar versión anterior
+  localStorage.removeItem('cmga_cirujanos_v1');
 }
 
 function getCirujanoOpts(selected){
@@ -1426,10 +1435,9 @@ function poblarSelectCirujano(selectId, valorActual=''){
 
 function agregarCirujano(){
   const input = document.getElementById('f-cirujano-nuevo');
-  const nombre = (input.value||'').trim();
+  const nombre = normalizarNombre(input.value);
   if(!nombre){ toast('Escribe el nombre del cirujano','error'); return; }
   const cat = getCatalogoCirujanos();
-  // Verificar duplicado (case-insensitive)
   const existe = cat.some(c => c.toLowerCase() === nombre.toLowerCase());
   if(existe){
     toast('Ese cirujano ya está en el catálogo');
@@ -1446,7 +1454,7 @@ function agregarCirujano(){
 
 function agregarCirujanoModal(){
   const input = document.getElementById('ec-nuevo');
-  const nombre = (input.value||'').trim();
+  const nombre = normalizarNombre(input.value);
   if(!nombre){ toast('Escribe el nombre del cirujano','error'); return; }
   const cat = getCatalogoCirujanos();
   const existe = cat.some(c => c.toLowerCase() === nombre.toLowerCase());
@@ -1463,34 +1471,37 @@ function agregarCirujanoModal(){
   toast(`✓ ${nombre} añadido al catálogo`);
 }
 
-// Al guardar un registro, si el cirujano no está en el catálogo, añadirlo
 function asegurarCirujanoEnCatalogo(nombre){
   if(!nombre) return;
   const cat = getCatalogoCirujanos();
-  const existe = cat.some(c => c.toLowerCase() === nombre.toLowerCase());
-  if(!existe){
-    cat.push(nombre);
+  const norm = normalizarNombre(nombre);
+  if(!cat.some(c => c.toLowerCase() === norm.toLowerCase())){
+    cat.push(norm);
     saveCatalogoCirujanos(cat);
   }
 }
 
-// Poblar el select al cargar datos desde la nube (catálogo se enriquece
-// con los cirujanos que ya existen en la base de datos)
+// Reconstruir catálogo COMPLETAMENTE desde Sheets en cada carga
+// Reemplaza el localStorage con los nombres normalizados de Sheets
+// eliminando cualquier duplicado o variante incorrecta acumulada
 function sincronizarCatalogoDesdeBD(){
-  const cat = getCatalogoCirujanos();
-  const enBD = [...new Set(DB.map(r=>r.cirujano).filter(Boolean))];
-  let cambios = false;
+  const enBD = DB.map(r => r.cirujano).filter(Boolean);
+  // Deduplicar por lowercase: si existen "dr garcia" y "DR GARCIA",
+  // queda solo la versión normalizada "Dr. Garcia"
+  const vistos = new Map();
   enBD.forEach(nombre => {
-    if(!cat.some(c => c.toLowerCase() === nombre.toLowerCase())){
-      cat.push(nombre);
-      cambios = true;
-    }
+    const norm = normalizarNombre(nombre);
+    const key  = norm.toLowerCase();
+    if(!vistos.has(key)) vistos.set(key, norm);
   });
-  if(cambios) saveCatalogoCirujanos(cat);
+  const catLimpio = [...vistos.values()];
+  // Reemplazar localStorage con catálogo limpio desde Sheets
+  saveCatalogoCirujanos(catLimpio);
   poblarSelectCirujano('f-cirujano');
+  console.log(`Catálogo sincronizado: ${catLimpio.length} cirujanos desde Sheets`);
 }
 
-// Inicializar el select del formulario de registro al cargar la página
+// Inicializar con lo que haya en localStorage mientras carga Sheets
 poblarSelectCirujano('f-cirujano');
 
 render();
