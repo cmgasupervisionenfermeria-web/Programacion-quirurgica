@@ -293,7 +293,15 @@ style="background:var(--gris1);color:var(--gris5);cursor:default">
 <div class="form-group"><label>Lateralidad</label>
 <select id="f-lateralidad"><option value="">— Selecciona —</option><option>N/A</option><option>Derecha</option><option>Izquierda</option><option>Bilateral</option></select>
 </div>
-<div class="form-group"><label>Cirujano</label><input type="text" id="f-cirujano" placeholder="Dr. / Dra."></div>
+<div class="form-group"><label>Cirujano</label>
+<select id="f-cirujano">
+<option value="">— Selecciona o añade nuevo —</option>
+</select>
+<div style="display:flex;gap:6px;margin-top:5px">
+<input type="text" id="f-cirujano-nuevo" placeholder="Nuevo cirujano… ej. Dr. García López" style="flex:1;font-size:12px;padding:6px 9px">
+<button type="button" onclick="agregarCirujano()" class="btn btn-ghost btn-sm" style="white-space:nowrap;font-size:12px">+ Añadir</button>
+</div>
+</div>
 <div class="form-group"><label>Anestesiólogo</label><input type="text" id="f-anestesiologo" placeholder="Dr. / Dra."></div>
 <div class="form-group"><label>Instrumentista</label><input type="text" id="f-instrumentista" placeholder="Enf. / Nombre"></div>
 <div class="form-group"><label>Estatus</label>
@@ -450,6 +458,8 @@ async function cargarDatos(){
     DB = Array.isArray(data) ? data : [];
     nid = DB.length ? Math.max(...DB.map(x=>Number(x.id)||0))+1 : 1;
     diaDB={};
+    // Guardar snapshot de DB actual antes de reemplazar (para merge)
+    const dbAnterior = [...DB];
     DB.forEach(r=>{
       if(r.fecha) r.fecha = r.fecha.toString().split('T')[0];
       if(r._fecha) r._fecha = r._fecha.toString().split('T')[0];
@@ -471,11 +481,20 @@ async function cargarDatos(){
         if(dr < 0) dr += 1440;
         if(dr > 0) r.duracionReal = dr;
       }
+      // Merge: si el registro existía localmente con estado diferente,
+      // preservar el estado local (puede ser más reciente que Sheets)
+      const local = dbAnterior.find(x=>String(x.id)===String(r.id));
+      if(local && local.estado !== r.estado){
+        // El local tiene cambio — reenviar update silencioso a Sheets
+        r.estado = local.estado;
+        apiCall({action:'update', record:{...r, estado:local.estado}}).catch(()=>{});
+      }
       const f=r.fecha||r._fecha;
       if(f){if(!diaDB[f])diaDB[f]=[];diaDB[f].push(r);}
     });
   } catch(e){ console.error(e); }
   hideLoader();
+  sincronizarCatalogoDesdeBD();  // enriquece el catálogo con cirujanos ya en la BD
   render();
   if(document.getElementById('page-base').classList.contains('active')) renderTabla();
   if(document.getElementById('page-concentrado').classList.contains('active')) renderConcentrado();
@@ -732,8 +751,20 @@ async function chSt(id,est){
     sg.estado=est;sS(s);
     const idx=DB.findIndex(x=>String(x.id)===String(id));if(idx>-1)DB[idx].estado=est;
     showLoader('💾 Actualizando…');
-    await apiCall({action:'update',record:{...sg,estado:est}});
-    hideLoader(); toast('Estatus actualizado');
+    // Enviar el registro COMPLETO, no solo el estado, para evitar pérdida de datos
+    const recCompleto = DB.find(x=>String(x.id)===String(id)) || sg;
+    const res = await apiCall({action:'update', record:{...recCompleto, estado:est}});
+    hideLoader();
+    if(res && res.ok){
+      toast('Estatus actualizado ✓');
+    } else {
+      // Reintentar una vez si falló
+      showLoader('🔄 Reintentando…');
+      await new Promise(r=>setTimeout(r,1500));
+      const res2 = await apiCall({action:'update', record:{...recCompleto, estado:est}});
+      hideLoader();
+      toast(res2&&res2.ok ? 'Estatus actualizado ✓' : '⚠ Guardado localmente — verifica conexión', res2&&res2.ok?'success':'error');
+    }
   }
   openDetail(id); render();
 }
@@ -753,8 +784,24 @@ async function guardarEnDB(id){
   const rec={...sg,fecha:dk(cur),_fecha:dk(cur)};
   showLoader('💾 Guardando en Google Sheets…');
   const existing=DB.findIndex(x=>String(x.id)===String(id));
-  if(existing>-1){DB[existing]=rec;await apiCall({action:'update',record:rec});toast('Registro actualizado');}
-  else{DB.push(rec);await apiCall({action:'save',record:rec});toast('Guardado en la nube ☁️');}
+  let res;
+  if(existing>-1){
+    DB[existing]=rec;
+    res=await apiCall({action:'update',record:rec});
+    if(!res||!res.ok){
+      await new Promise(r=>setTimeout(r,1500));
+      res=await apiCall({action:'update',record:rec});
+    }
+    toast(res&&res.ok?'Registro actualizado ✓':'⚠ Error al guardar — reintenta', res&&res.ok?'success':'error');
+  } else {
+    DB.push(rec);
+    res=await apiCall({action:'save',record:rec});
+    if(!res||!res.ok){
+      await new Promise(r=>setTimeout(r,1500));
+      res=await apiCall({action:'save',record:rec});
+    }
+    toast(res&&res.ok?'Guardado en la nube ☁️':'⚠ Error al guardar — reintenta', res&&res.ok?'success':'error');
+  }
   hideLoader(); closeModal();
 }
 
@@ -781,7 +828,7 @@ function openForm(sg){
       <div class="form-group"><label>N° Expediente</label><input id="eexp" value="${sg.expediente||''}"></div>
       <div class="form-group full"><label>Paciente</label><input id="ep" value="${sg.paciente||''}"></div>
       <div class="form-group full"><label>Procedimiento</label><input id="et" value="${sg.tipo||''}"></div>
-      <div class="form-group"><label>Cirujano</label><input id="ec" value="${sg.cirujano||''}"></div>
+      <div class="form-group"><label>Cirujano</label><select id="ec">${getCirujanoOpts(sg.cirujano||'')}</select><div style="display:flex;gap:6px;margin-top:5px"><input type="text" id="ec-nuevo" placeholder="Nuevo cirujano…" style="flex:1;font-size:12px;padding:6px 9px"><button type="button" onclick="agregarCirujanoModal()" class="btn btn-ghost btn-sm" style="white-space:nowrap;font-size:12px">+ Añadir</button></div></div>
       <div class="form-group"><label>Anestesiólogo</label><input id="ea" value="${sg.anestesiologo||''}"></div>
       <div class="form-group"><label>Instrumentista</label><input id="ei" value="${sg.instrumentista||''}"></div>
       <div class="form-group"><label>Insumos / Material</label><input id="em" value="${sg.insumos||''}"></div>
@@ -818,6 +865,7 @@ function openForm(sg){
       <button class="btn btn-success" onclick="saveFrm(${sg.id||0})">✓ Guardar</button>
     </div>`;
   document.getElementById('modalBg').style.display='flex';
+  poblarSelectCirujano('ec', sg.cirujano||'');
   chkCf(sg.id||0);
 }
 
@@ -848,7 +896,13 @@ async function saveFrm(id){
   const fin = document.getElementById('ehf').value;
   let durReal = null;
   if(ini && fin){ const d = pH(fin)-pH(ini); if(d>0) durReal=d; }
+  // Recuperar registro original para preservar campos que no están en el modal de edición
+  // (personal, motivo, cirugiaSegura, eventoAdverso, tipoQx, etc.)
+  const original = s.find(x=>String(x.id)===String(id)) || DB.find(x=>String(x.id)===String(id)) || {};
   const d={
+    // Preservar todos los campos del original primero
+    ...original,
+    // Sobreescribir solo los campos que sí están en el modal de edición
     id:id||nid++,
     fecha:dk(cur), _fecha:dk(cur),
     paciente:document.getElementById('ep').value.trim()||'Sin nombre',
@@ -873,6 +927,7 @@ async function saveFrm(id){
     piezaDestino:document.getElementById('epiezadestino')?.value||'',
     piezaPatologo:document.getElementById('epiezapatologo')?.value.trim()||'',
   };
+  asegurarCirujanoEnCatalogo(d.cirujano);
   showLoader('💾 Guardando…');
   if(id){
     const i=s.findIndex(x=>String(x.id)===String(id));if(i>-1)s[i]=d;sS(s);
@@ -982,6 +1037,8 @@ function guardarCirugia(){
   if(!diaDB[fk]) diaDB[fk]=[];
   diaDB[fk].push(rec);
   DB.push(rec);
+  asegurarCirujanoEnCatalogo(rec.cirujano);
+  poblarSelectCirujano('f-cirujano', rec.cirujano);
   showLoader('💾 Guardando en Google Sheets…');
   apiCall({action:'save', record:rec}).then(()=>{
     hideLoader();
@@ -1333,8 +1390,111 @@ document.getElementById('btnNueva').onclick=()=>{
   requirePin(()=>{ showPage('registro',null); document.querySelector('[onclick="showPage(\'registro\',this)"]')?.classList.add('active'); });
 };
 
+// ── CATÁLOGO DINÁMICO DE CIRUJANOS ───────────────────────────────────────────
+// El catálogo se guarda en localStorage. Cuando se registra un cirujano nuevo
+// se añade automáticamente; los siguientes registros solo pueden elegirlo del
+// desplegable, garantizando consistencia en el concentrado.
+
+const CAT_KEY = 'cmga_cirujanos_v1';
+
+function getCatalogoCirujanos(){
+  try { return JSON.parse(localStorage.getItem(CAT_KEY)) || []; }
+  catch(e){ return []; }
+}
+
+function saveCatalogoCirujanos(arr){
+  // Ordenar alfabéticamente antes de guardar
+  arr.sort((a,b) => a.localeCompare(b, 'es', {sensitivity:'base'}));
+  localStorage.setItem(CAT_KEY, JSON.stringify(arr));
+}
+
+function getCirujanoOpts(selected){
+  const cat = getCatalogoCirujanos();
+  const opts = ['<option value="">— Selecciona —</option>'];
+  cat.forEach(c => {
+    opts.push(`<option value="${c}"${c===selected?' selected':''}>${c}</option>`);
+  });
+  return opts.join('');
+}
+
+function poblarSelectCirujano(selectId, valorActual=''){
+  const sel = document.getElementById(selectId);
+  if(!sel) return;
+  sel.innerHTML = getCirujanoOpts(valorActual);
+}
+
+function agregarCirujano(){
+  const input = document.getElementById('f-cirujano-nuevo');
+  const nombre = (input.value||'').trim();
+  if(!nombre){ toast('Escribe el nombre del cirujano','error'); return; }
+  const cat = getCatalogoCirujanos();
+  // Verificar duplicado (case-insensitive)
+  const existe = cat.some(c => c.toLowerCase() === nombre.toLowerCase());
+  if(existe){
+    toast('Ese cirujano ya está en el catálogo');
+    poblarSelectCirujano('f-cirujano', nombre);
+    input.value = '';
+    return;
+  }
+  cat.push(nombre);
+  saveCatalogoCirujanos(cat);
+  poblarSelectCirujano('f-cirujano', nombre);
+  input.value = '';
+  toast(`✓ ${nombre} añadido al catálogo`);
+}
+
+function agregarCirujanoModal(){
+  const input = document.getElementById('ec-nuevo');
+  const nombre = (input.value||'').trim();
+  if(!nombre){ toast('Escribe el nombre del cirujano','error'); return; }
+  const cat = getCatalogoCirujanos();
+  const existe = cat.some(c => c.toLowerCase() === nombre.toLowerCase());
+  if(existe){
+    toast('Ese cirujano ya está en el catálogo');
+    poblarSelectCirujano('ec', nombre);
+    input.value = '';
+    return;
+  }
+  cat.push(nombre);
+  saveCatalogoCirujanos(cat);
+  poblarSelectCirujano('ec', nombre);
+  input.value = '';
+  toast(`✓ ${nombre} añadido al catálogo`);
+}
+
+// Al guardar un registro, si el cirujano no está en el catálogo, añadirlo
+function asegurarCirujanoEnCatalogo(nombre){
+  if(!nombre) return;
+  const cat = getCatalogoCirujanos();
+  const existe = cat.some(c => c.toLowerCase() === nombre.toLowerCase());
+  if(!existe){
+    cat.push(nombre);
+    saveCatalogoCirujanos(cat);
+  }
+}
+
+// Poblar el select al cargar datos desde la nube (catálogo se enriquece
+// con los cirujanos que ya existen en la base de datos)
+function sincronizarCatalogoDesdeBD(){
+  const cat = getCatalogoCirujanos();
+  const enBD = [...new Set(DB.map(r=>r.cirujano).filter(Boolean))];
+  let cambios = false;
+  enBD.forEach(nombre => {
+    if(!cat.some(c => c.toLowerCase() === nombre.toLowerCase())){
+      cat.push(nombre);
+      cambios = true;
+    }
+  });
+  if(cambios) saveCatalogoCirujanos(cat);
+  poblarSelectCirujano('f-cirujano');
+}
+
+// Inicializar el select del formulario de registro al cargar la página
+poblarSelectCirujano('f-cirujano');
+
 render();
 cargarDatos();
 </script>
 </body>
 </html>
+                                               
