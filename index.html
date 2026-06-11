@@ -1481,21 +1481,31 @@ function asegurarCirujanoEnCatalogo(nombre){
   }
 }
 
+// Correcciones explícitas de nombres con error tipográfico conocido
+// Clave: nombre incorrecto en minúsculas → valor: nombre correcto
+const CORRECCIONES_CIRUJANOS = {
+  'dr. erick mier'  : 'Dr. Erik Mier',
+  'dr. huberto alonso': 'Dr. Humberto Alonso',
+};
+
+function corregirNombre(nombre){
+  const key = normalizarNombre(nombre).toLowerCase();
+  return CORRECCIONES_CIRUJANOS[key] || normalizarNombre(nombre);
+}
+
 // Reconstruir catálogo COMPLETAMENTE desde Sheets en cada carga
 // Reemplaza el localStorage con los nombres normalizados de Sheets
 // eliminando cualquier duplicado o variante incorrecta acumulada
 function sincronizarCatalogoDesdeBD(){
   const enBD = DB.map(r => r.cirujano).filter(Boolean);
-  // Deduplicar por lowercase: si existen "dr garcia" y "DR GARCIA",
-  // queda solo la versión normalizada "Dr. Garcia"
+  // Aplicar correcciones y deduplicar por lowercase
   const vistos = new Map();
   enBD.forEach(nombre => {
-    const norm = normalizarNombre(nombre);
-    const key  = norm.toLowerCase();
-    if(!vistos.has(key)) vistos.set(key, norm);
+    const corregido = corregirNombre(nombre);
+    const key = corregido.toLowerCase();
+    if(!vistos.has(key)) vistos.set(key, corregido);
   });
   const catLimpio = [...vistos.values()];
-  // Reemplazar localStorage con catálogo limpio desde Sheets
   saveCatalogoCirujanos(catLimpio);
   poblarSelectCirujano('f-cirujano');
   console.log(`Catálogo sincronizado: ${catLimpio.length} cirujanos desde Sheets`);
