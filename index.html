@@ -440,22 +440,35 @@ function sS(a){ diaDB[dk(cur)]=a; }
 function showLoader(m){ let el=document.getElementById('loaderBar'); if(!el){el=document.createElement('div');el.id='loaderBar';el.style.cssText='position:fixed;top:54px;left:0;right:0;background:#2563A8;color:#fff;text-align:center;padding:6px;font-size:12px;z-index:300';document.body.appendChild(el);} el.textContent=m;el.style.display='block'; }
 function hideLoader(){ const el=document.getElementById('loaderBar'); if(el) el.style.display='none'; }
 
+// ── JSONP HELPER (evita el bloqueo CORS de fetch al hablar con Apps Script) ─
+function jsonpRequest(url){
+  return new Promise((resolve,reject)=>{
+    const cb='jsonp_cb_'+Date.now()+'_'+Math.floor(Math.random()*100000);
+    const script=document.createElement('script');
+    let done=false;
+    function cleanup(){ delete window[cb]; if(script.parentNode) script.parentNode.removeChild(script); }
+    window[cb]=function(data){ done=true; cleanup(); resolve(data); };
+    script.onerror=function(){ if(!done){ cleanup(); reject(new Error('JSONP error')); } };
+    script.src=url+(url.indexOf('?')>-1?'&':'?')+'callback='+cb;
+    document.body.appendChild(script);
+    setTimeout(function(){ if(!done){ cleanup(); reject(new Error('JSONP timeout')); } },15000);
+  });
+}
+
 async function apiCall(payload){
   try{
     const params = new URLSearchParams();
     params.append('action', payload.action);
     if(payload.record) params.append('record', JSON.stringify(payload.record));
     if(payload.id !== undefined) params.append('id', payload.id);
-    const r = await fetch(GAS_URL + '?' + params.toString());
-    return await r.json();
+    return await jsonpRequest(GAS_URL + '?' + params.toString());
   } catch(e){ console.error(e); return {ok:false}; }
 }
 
 async function cargarDatos(){
   showLoader('🔄 Sincronizando con Google Sheets…');
   try{
-    const r = await fetch(GAS_URL + '?action=getAll');
-    const data = await r.json();
+    const data = await jsonpRequest(GAS_URL + '?action=getAll');
     DB = Array.isArray(data) ? data : [];
     nid = DB.length ? Math.max(...DB.map(x=>Number(x.id)||0))+1 : 1;
     diaDB={};
@@ -472,6 +485,9 @@ async function cargarDatos(){
           const mins = d.getUTCHours()*60 + d.getUTCMinutes();
           return String(Math.floor(mins/60)).padStart(2,'0')+':'+String(mins%60).padStart(2,'0');
         }
+        // Normaliza "7:00" -> "07:00" por si llega sin cero a la izquierda
+        const m = s.match(/^(\d{1,2}):(\d{2})$/);
+        if(m) return m[1].padStart(2,'0')+':'+m[2];
         return s;
       }
       r.hora = fixHora(r.hora);
@@ -548,6 +564,13 @@ function fillSel(id, opts, blank='— Selecciona —'){
   opts.forEach(h=>{ const o=document.createElement('option'); o.value=h; o.textContent=h; s.appendChild(o); });
 }
 fillSel('f-hora', HORAS30);
+
+// Normaliza "7:00" -> "07:00" para que las comparaciones con HORAS30 no fallen
+function normHora(h){
+  if(!h) return '';
+  const m = String(h).match(/^(\d{1,2}):(\d{2})$/);
+  return m ? m[1].padStart(2,'0')+':'+m[2] : String(h);
+}
 
 function calcDuracionReal(){
   const ini = document.getElementById('f-hora-real').value;
@@ -704,7 +727,7 @@ function switchView(v){
 }
 
 function openDetail(id){
-  const sg=gS().find(x=>x.id===id); if(!sg) return;
+  const sg=gS().find(x=>String(x.id)===String(id)); if(!sg) return;
   const cf=dC(gS()),isc=cf.has(sg.id);
   const others=isc?dCFor(gS(),id,sg.hora,sg.duracion||60,sg.qx,sg.estado):[];
   const reinDB=DB.filter(r=>r.expediente&&r.expediente===sg.expediente);
@@ -806,11 +829,12 @@ async function guardarEnDB(id){
   hideLoader(); closeModal();
 }
 
-function openEdit(id){ openForm(gS().find(x=>x.id===id)||{}); }
+function openEdit(id){ openForm(gS().find(x=>String(x.id)===String(id))||{}); }
 
 function openForm(sg){
   sg=sg||{}; const isN=!sg.id;
-  const hOpts=HORAS30.map(h=>`<option value="${h}"${sg.hora===h?' selected':''}>${h}</option>`).join('');
+  const sgHoraNorm = normHora(sg.hora);
+  const hOpts=HORAS30.map(h=>`<option value="${h}"${sgHoraNorm===h?' selected':''}>${h}</option>`).join('');
   const latOpts=['','N/A','Derecha','Izquierda','Bilateral'].map(l=>`<option value="${l}"${sg.lateralidad===l?' selected':''}>${l||'— Selecciona —'}</option>`).join('');
   const durR = sg.duracionReal || '';
   document.getElementById('modalContent').innerHTML=
@@ -834,6 +858,7 @@ function openForm(sg){
       <div class="form-group"><label>Instrumentista</label><input id="ei" value="${sg.instrumentista||''}"></div>
       <div class="form-group"><label>Insumos / Material</label><input id="em" value="${sg.insumos||''}"></div>
       <div class="form-group"><label>Proveedor</label><input id="eprov" value="${sg.proveedor||''}"></div>
+      <div class="form-group"><label>Personal que Programa</label><input id="epersonal" value="${sg.personal||''}"></div>
     </div>`+
     `<div style="font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--gris4);padding:10px 0 8px;border-bottom:1px solid var(--gris2);margin-bottom:10px">Pieza Patológica</div>`+
     `<div class="form-grid-3" style="gap:10px;margin-bottom:10px">
@@ -898,7 +923,7 @@ async function saveFrm(id){
   let durReal = null;
   if(ini && fin){ const d = pH(fin)-pH(ini); if(d>0) durReal=d; }
   // Recuperar registro original para preservar campos que no están en el modal de edición
-  // (personal, motivo, cirugiaSegura, eventoAdverso, tipoQx, etc.)
+  // (motivo, cirugiaSegura, eventoAdverso, tipoQx, etc.)
   const original = s.find(x=>String(x.id)===String(id)) || DB.find(x=>String(x.id)===String(id)) || {};
   const d={
     // Preservar todos los campos del original primero
@@ -923,6 +948,7 @@ async function saveFrm(id){
     especialidad:document.getElementById('eesp').value.trim(),
     insumos:document.getElementById('em').value.trim(),
     proveedor:document.getElementById('eprov').value.trim(),
+    personal:document.getElementById('epersonal').value.trim(),
     piezaPat:document.getElementById('epiezapat').value,
     piezaDesc:document.getElementById('epiezadesc')?.value.trim()||'',
     piezaDestino:document.getElementById('epiezadestino')?.value||'',
@@ -1121,8 +1147,8 @@ function limpFiltros(){
 
 function exportarCSV(){
   if(!DB.length){toast('Sin datos para exportar','error');return}
-  const cols=['fecha','qx','hora','horaReal','horaFin','duracionReal','expediente','paciente','tipo','tipoQx','especialidad','lateralidad','cirujano','anestesiologo','instrumentista','duracion','estado','cirugiaSegura','eventoAdverso','eventoAdversoDesc','piezaPat','piezaDesc','piezaDestino','insumos','proveedor','personal','motivo','personalCancel'];
-  const hdrs=['Fecha','Quirófano','Hora Prog.','Hora Real Inicio','Hora Real Fin','Duración Real (min)','N° Expediente','Paciente','Procedimiento','Tipo Cirugía','Especialidad','Lateralidad','Cirujano','Anestesiólogo','Instrumentista','Duración Est. (min)','Estatus','Hoja Cir. Segura','Evento Adverso','Desc. Evento Adverso','Pieza Patológica','Desc. Pieza','Destino Pieza','Insumos','Proveedor','Personal','Motivo Cancelación','Personal Cancela'];
+  const cols=['fecha','qx','hora','horaReal','horaFin','duracionReal','expediente','paciente','tipo','tipoQx','especialidad','lateralidad','cirujano','anestesiologo','instrumentista','duracion','estado','cirugiaSegura','eventoAdverso','eventoAdversoDesc','piezaPat','piezaDesc','piezaDestino','piezaPatologo','insumos','proveedor','personal','motivo','personalCancel'];
+  const hdrs=['Fecha','Quirófano','Hora Prog.','Hora Real Inicio','Hora Real Fin','Duración Real (min)','N° Expediente','Paciente','Procedimiento','Tipo Cirugía','Especialidad','Lateralidad','Cirujano','Anestesiólogo','Instrumentista','Duración Est. (min)','Estatus','Hoja Cir. Segura','Evento Adverso','Desc. Evento Adverso','Pieza Patológica','Desc. Pieza','Destino Pieza','Patólogo / Lab.','Insumos','Proveedor','Personal','Motivo Cancelación','Personal Cancela'];
   const csv=[hdrs.join(','),...DB.map(r=>cols.map(c=>`"${(r[c]||'').toString().replace(/"/g,'""')}"`).join(','))].join('\n');
   const a=document.createElement('a');
   a.href='data:text/csv;charset=utf-8,\uFEFF'+encodeURIComponent(csv);
