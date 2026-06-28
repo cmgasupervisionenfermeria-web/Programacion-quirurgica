@@ -652,7 +652,10 @@ function badgeEst(e){
 }
 
 function requiereConfirmacion(sg){
-  return !!(sg.insumos && sg.insumos.trim() && sg.proveedor && sg.proveedor.trim());
+  return !!(
+    (sg.insumos && sg.insumos.trim()) ||
+    (sg.proveedor && sg.proveedor.trim())
+  );
 }
 
 function actualizarBadgeInsumos(){
