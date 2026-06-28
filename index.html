@@ -161,6 +161,15 @@ tbody tr:last-child{border-bottom:none}
 .toast.show{transform:translateY(0);opacity:1}
 .toast.success{background:var(--verde)}
 .toast.error{background:var(--rojo)}
+/* CONFIRMACIÓN DE INSUMOS */
+.insumos-badge{position:absolute;top:-6px;right:-6px;background:var(--rojo2);color:#fff;
+  border-radius:99px;font-size:10px;font-weight:700;padding:1px 6px;min-width:18px;
+  text-align:center;pointer-events:none;line-height:16px}
+.nav-tab-wrap{position:relative;display:inline-flex;align-items:center}
+.btn-confirmar{background:#FEF3C7;color:#92400E;border:1.5px solid #F59E0B;
+  border-radius:8px;padding:8px 14px;cursor:pointer;font-size:13px;font-weight:600;
+  font-family:inherit;transition:all .15s}
+.btn-confirmar:hover{background:#F59E0B;color:#fff}
 .install-bar{background:var(--az3);border:1px solid #B5D4F4;border-radius:var(--r);padding:10px 14px;margin-bottom:14px;display:flex;align-items:center;gap:10px;font-size:13px;color:#1E3A5F}
 .dur-real-chip{display:inline-flex;align-items:center;gap:4px;background:var(--verde3);color:var(--verde);border-radius:99px;padding:2px 9px;font-size:11px;font-weight:500;margin-left:6px}
 @media(max-width:700px){
@@ -175,7 +184,7 @@ tbody tr:last-child{border-bottom:none}
 <nav>
 <div class="logo">🏥 <span>Qx</span>Programación</div>
 <div class="nav-tabs">
-<button class="nav-tab active" onclick="showPage('dia',this)">📅 Por Día</button>
+<span class="nav-tab-wrap"><button class="nav-tab active" onclick="showPage('dia',this)">📅 Por Día</button><span id="badge-insumos" class="insumos-badge" style="display:none">0</span></span>
 <button class="nav-tab" onclick="showPage('base',this)">☰ Base de Datos</button>
 <button class="nav-tab" onclick="showPage('concentrado',this)">📊 Concentrado</button>
 </div>
@@ -384,7 +393,7 @@ style="background:var(--gris1);color:var(--gris5);cursor:default">
 <th>Fecha</th><th>Qx</th><th>Hora Prog.</th><th>N° Exp.</th><th>Paciente</th>
 <th>Procedimiento</th><th>Especialidad</th><th>Cirujano</th><th>Lateralidad</th>
 <th>Dur. Est.</th><th>H. Inicio</th><th>H. Fin</th><th>Dur. Real</th>
-<th>Estatus</th><th>Reintervención</th><th>Cir. Segura</th><th>Ev. Adverso</th><th></th>
+<th>Estatus</th><th>Reintervención</th><th>Cir. Segura</th><th>Ev. Adverso</th><th>Insumos</th><th></th>
 </tr></thead>
 <tbody id="tabla-body"></tbody>
 </table>
@@ -513,6 +522,7 @@ async function cargarDatos(){
   hideLoader();
   sincronizarCatalogoDesdeBD();  // enriquece el catálogo con cirujanos ya en la BD
   render();
+  actualizarBadgeInsumos();
   if(document.getElementById('page-base').classList.contains('active')) renderTabla();
   if(document.getElementById('page-concentrado').classList.contains('active')) renderConcentrado();
 }
@@ -641,6 +651,53 @@ function badgeEst(e){
   return `<span class="badge b-${cl}">${e||'—'}</span>`;
 }
 
+function requiereConfirmacion(sg){
+  return !!(sg.insumos && sg.insumos.trim() && sg.proveedor && sg.proveedor.trim());
+}
+
+function actualizarBadgeInsumos(){
+  const s = gS();
+  const pendientes = s.filter(function(sg){
+    return requiereConfirmacion(sg) && !sg.insumosConfirmado
+      && (sg.estado||'') !== 'Cancelada' && (sg.estado||'') !== 'cancelada'
+      && (sg.estado||'') !== 'Suspendida';
+  }).length;
+  const badge = document.getElementById('badge-insumos');
+  if(badge){
+    badge.textContent = pendientes;
+    badge.style.display = pendientes > 0 ? 'inline-block' : 'none';
+  }
+}
+
+async function confirmarInsumos(id){
+  requirePin(function(){
+    const nombre = prompt('Nombre de quien confirma los insumos:');
+    if(!nombre || !nombre.trim()) return;
+    const s = gS();
+    const sg = s.find(function(x){ return String(x.id)===String(id); });
+    if(!sg) return;
+    const fecha = new Date().toLocaleString('es-MX');
+    sg.insumosConfirmado = true;
+    sg.insumosConfirmadoPor = nombre.trim();
+    sg.insumosConfirmadoFecha = fecha;
+    sS(s);
+    const idx = DB.findIndex(function(x){ return String(x.id)===String(id); });
+    if(idx > -1){
+      DB[idx].insumosConfirmado = true;
+      DB[idx].insumosConfirmadoPor = nombre.trim();
+      DB[idx].insumosConfirmadoFecha = fecha;
+    }
+    const recCompleto = DB.find(function(x){ return String(x.id)===String(id); }) || sg;
+    showLoader('💾 Guardando confirmación…');
+    apiCall({action:'update', record:{...recCompleto,
+      insumosConfirmado:true, insumosConfirmadoPor:nombre.trim(), insumosConfirmadoFecha:fecha
+    }}).then(hideLoader).catch(hideLoader);
+    actualizarBadgeInsumos();
+    toast('✓ Insumos confirmados por '+nombre.trim());
+    openDetail(id);
+  });
+}
+
 function rBanner(s,cf){
   const el=document.getElementById('alertBanner');
   if(!cf.size){el.innerHTML='';return}
@@ -650,7 +707,22 @@ function rBanner(s,cf){
     const aS=pH(a.hora),aE=aS+a.duracion,bS=pH(b.hora),bE=bS+b.duracion;
     if(aS<bE&&bS<aE){const k=Math.min(a.id,b.id)+'-'+Math.max(a.id,b.id);if(!seen.has(k)){seen.add(k);pairs.push({a,b})}}
   }
-  el.innerHTML='<div class="alert-banner"><span class="alert-icon">⚠️</span><div><div class="alert-title">'+pairs.length+' traslape'+(pairs.length>1?'s':'')+' detectado'+(pairs.length>1?'s':'')+'</div>'+pairs.map(p=>'<div class="alert-item">· <b>'+p.a.qx+'</b>: '+p.a.paciente.split(',')[0]+' ('+p.a.hora+') y '+p.b.paciente.split(',')[0]+' ('+p.b.hora+')</div>').join('')+'</div></div>';
+  // Banner traslapes
+  let bannerHTML = '';
+  if(cf.size && pairs.length){
+    bannerHTML += '<div class="alert-banner"><span class="alert-icon">⚠️</span><div><div class="alert-title">'+pairs.length+' traslape'+(pairs.length>1?'s':'')+' detectado'+(pairs.length>1?'s':'')+'</div>'+pairs.map(p=>'<div class="alert-item">· <b>'+p.a.qx+'</b>: '+p.a.paciente.split(',')[0]+' ('+p.a.hora+') y '+p.b.paciente.split(',')[0]+' ('+p.b.hora+')</div>').join('')+'</div></div>';
+  }
+  // Banner insumos pendientes
+  const insPend = s.filter(function(sg){
+    return requiereConfirmacion(sg) && !sg.insumosConfirmado
+      && (sg.estado||'')!=='Cancelada' && (sg.estado||'')!=='cancelada'
+      && (sg.estado||'')!=='Suspendida';
+  });
+  if(insPend.length){
+    bannerHTML += '<div class="alert-insumos" style="background:#FEF3C7;border:1px solid #F59E0B;border-radius:var(--r);padding:10px 14px;margin-bottom:10px;display:flex;align-items:flex-start;gap:10px;font-size:13px"><span class="alert-icon">📦</span><div><div style="font-weight:600;color:#92400E;margin-bottom:3px">'+insPend.length+' cirugía'+(insPend.length>1?'s':'')+' con insumos especiales pendientes de confirmar</div>'+insPend.map(function(sg){ return '<div style="font-size:12px;color:#78350F;line-height:1.5">· <b>'+sg.qx+'</b> '+sg.hora+' — '+(sg.paciente||'').split(',')[0]+' 📦 '+sg.insumos+' / '+sg.proveedor+'</div>'; }).join('')+'</div></div>';
+  }
+  el.innerHTML = bannerHTML;
+  actualizarBadgeInsumos();
 }
 
 function rStats(s,cf){
@@ -753,6 +825,17 @@ function openDetail(id){
     `<div class="dm-row"><span class="dm-lbl">Instrumentista</span><span>${sg.instrumentista||'—'}</span></div>`+
     `<div class="dm-row"><span class="dm-lbl">Lateralidad</span><span>${sg.lateralidad||'—'}</span></div>`+
     `<div class="dm-row"><span class="dm-lbl">Insumos</span><span>${sg.insumos||'—'}</span></div>`+
+    (requiereConfirmacion(sg) ?
+      `<div style="background:${sg.insumosConfirmado?'var(--verde3)':'#FEF9C3'};border:1.5px solid ${sg.insumosConfirmado?'var(--verde2)':'#F59E0B'};border-radius:10px;padding:12px 14px;margin:10px 0;display:flex;align-items:center;justify-content:space-between;gap:12px">
+        <div>
+          <div style="font-size:11px;font-weight:700;color:${sg.insumosConfirmado?'var(--verde)':'#92400E'};text-transform:uppercase;letter-spacing:.04em;margin-bottom:3px">${sg.insumosConfirmado?'✅ Insumos confirmados':'📦 Insumos especiales — pendiente'}</div>
+          <div style="font-size:12px;color:${sg.insumosConfirmado?'#14532D':'#78350F'}">Proveedor: <b>${sg.proveedor||'—'}</b></div>
+          ${sg.insumosConfirmado?`<div style="font-size:11px;color:var(--gris5);margin-top:3px">Confirmado por <b>${sg.insumosConfirmadoPor}</b> · ${sg.insumosConfirmadoFecha}</div>`:''}
+        </div>
+        ${sg.insumosConfirmado
+          ? '<span style="font-size:24px">✅</span>'
+          : `<button class="btn-confirmar" onclick="confirmarInsumos(${sg.id})">✓ Confirmar insumos</button>`}
+      </div>` : '')+
     `<div class="dm-row"><span class="dm-lbl">Programó</span><span>${sg.personal||'—'}</span></div>`+
     `<div class="dm-row"><span class="dm-lbl">Pieza patológica</span><span style="${sg.piezaPat==='Sí'?'color:var(--verde);font-weight:500':''}">${sg.piezaPat||'—'}</span></div>`+
     (sg.piezaPat==='Sí'?
@@ -953,6 +1036,10 @@ async function saveFrm(id){
     piezaDesc:document.getElementById('epiezadesc')?.value.trim()||'',
     piezaDestino:document.getElementById('epiezadestino')?.value||'',
     piezaPatologo:document.getElementById('epiezapatologo')?.value.trim()||'',
+    // Preservar confirmación de insumos al editar
+    insumosConfirmado: original.insumosConfirmado || false,
+    insumosConfirmadoPor: original.insumosConfirmadoPor || '',
+    insumosConfirmadoFecha: original.insumosConfirmadoFecha || '',
   };
   asegurarCirujanoEnCatalogo(d.cirujano);
   showLoader('💾 Guardando…');
@@ -1059,6 +1146,9 @@ function guardarCirugia(){
     piezaDestino:document.getElementById('f-pieza-destino').value,
     piezaPatologo:document.getElementById('f-pieza-patologo').value.trim(),
     _fecha:document.getElementById('f-fecha').value,
+    insumosConfirmado: false,
+    insumosConfirmadoPor: '',
+    insumosConfirmadoFecha: '',
   };
   const fk=rec.fecha;
   if(!diaDB[fk]) diaDB[fk]=[];
@@ -1125,6 +1215,11 @@ function renderTabla(){
       <td>${r.eventoAdverso==='Sí'
         ? `<span class="badge b-traslape" title="${r.eventoAdversoDesc||''}">⚠ Sí</span>`
         : r.eventoAdverso==='No'?'<span class="badge b-no">No</span>':'—'}</td>
+      <td>${requiereConfirmacion(r)
+        ? (r.insumosConfirmado
+            ? '<span class="badge b-completada" title="'+( r.insumosConfirmadoPor||'')+' · '+(r.insumosConfirmadoFecha||'')+'">✅ Confirmado</span>'
+            : '<span class="badge b-traslape">📦 Pendiente</span>')
+        : '—'}</td>
       <td><button class="btn btn-ghost btn-sm" style="color:var(--rojo2)" onclick="eliminarDB(${r.id})">✕</button></td>
     </tr>`;
   }).join('');
