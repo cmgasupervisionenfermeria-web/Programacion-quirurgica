@@ -700,7 +700,6 @@ async function confirmarInsumos(id){
 
 function rBanner(s,cf){
   const el=document.getElementById('alertBanner');
-  if(!cf.size){el.innerHTML='';return}
   const ac=s.filter(x=>x.estado!=='cancelada'&&x.estado!=='Cancelada'),pairs=[],seen=new Set();
   for(let i=0;i<ac.length;i++) for(let j=i+1;j<ac.length;j++){
     const a=ac[i],b=ac[j]; if(a.qx!==b.qx) continue;
