@@ -57,6 +57,8 @@ input:focus,select:focus{border-color:var(--az2);box-shadow:0 0 0 3px rgba(37,99
 .b-en-curso{background:var(--az3);color:var(--az)}
 .b-completada,.b-realizada{background:var(--verde3);color:var(--verde)}
 .b-cancelada{background:var(--gris1);color:var(--gris5)}
+.b-suspendida{background:#FFEDD5;color:#9A3412}
+.b-fallecimiento{background:#E5E7EB;color:#111827}
 .b-programada{background:var(--az3);color:var(--az)}
 .b-confirmada{background:#DBEAFE;color:#1D4ED8}
 .b-si{background:var(--morado3);color:var(--morado)}
@@ -118,6 +120,8 @@ input:focus,select:focus{border-color:var(--az2);box-shadow:0 0 0 3px rgba(37,99
 .sbtn.en-curso{background:var(--az3);color:#1E3A5F;border-color:var(--az2)}
 .sbtn.completada{background:var(--verde3);color:#14532D;border-color:var(--verde2)}
 .sbtn.cancelada{background:var(--gris1);color:var(--gris5);border-color:var(--gris3)}
+.sbtn.suspendida{background:#FFEDD5;color:#9A3412;border-color:#FB923C}
+.sbtn.fallecimiento{background:#E5E7EB;color:#111827;border-color:#6B7280}
 .sbtn.active-s{font-weight:700;box-shadow:0 0 0 2px currentColor}
 .dm-row{display:flex;gap:8px;margin-bottom:8px;font-size:13px}
 .dm-lbl{color:var(--gris4);min-width:130px;flex-shrink:0;font-size:12px}
@@ -382,7 +386,7 @@ style="background:var(--gris1);color:var(--gris5);cursor:default">
 <option value="">Todos los Qx</option><option>Quirófano 1</option><option>Quirófano 2</option><option>Quirófano 3</option>
 </select>
 <select id="fil-est" onchange="renderTabla()" style="width:120px">
-<option value="">Todos</option><option>Pendiente</option><option>En curso</option><option>Completada</option><option>Cancelada</option>
+<option value="">Todos</option><option>Pendiente</option><option>En curso</option><option>Completada</option><option>Cancelada</option><option>Suspendida</option><option>Fallecimiento</option><option value="__cierre">📝 Por cerrar</option>
 </select>
 <input type="text" id="fil-buscar" placeholder="🔍 Expediente o paciente…" oninput="renderTabla()" style="flex:1;min-width:160px">
 <button class="btn btn-ghost btn-sm" onclick="limpFiltros()">✕</button>
@@ -408,12 +412,11 @@ style="background:var(--gris1);color:var(--gris5);cursor:default">
 <div style="display:flex;gap:8px;align-items:center">
 <select id="con-mes" onchange="renderConcentrado()" style="padding:7px 10px;font-size:12px;border-radius:7px;border:1px solid var(--gris3)">
 <option value="0">Enero</option><option value="1">Febrero</option><option value="2">Marzo</option>
-<option value="3">Abril</option><option value="4">Mayo</option><option value="5" selected>Junio</option>
+<option value="3">Abril</option><option value="4">Mayo</option><option value="5">Junio</option>
 <option value="6">Julio</option><option value="7">Agosto</option><option value="8">Septiembre</option>
 <option value="9">Octubre</option><option value="10">Noviembre</option><option value="11">Diciembre</option>
 </select>
 <select id="con-anio" onchange="renderConcentrado()" style="padding:7px 10px;font-size:12px;border-radius:7px;border:1px solid var(--gris3)">
-<option>2026</option><option>2027</option>
 </select>
 </div>
 </div>
@@ -430,7 +433,90 @@ style="background:var(--gris1);color:var(--gris5);cursor:default">
 const GAS_URL = 'https://script.google.com/macros/s/AKfycbwyQdQl-QuUcek0m7_8BvGAPU9kyIqkwxuaFLvh3K--u8xUGLqlXA-ev78sbyBixuK3NA/exec';
 const PIN_CORRECTO = 'QXCMG26';
 const QXS = ['Quirófano 1','Quirófano 2','Quirófano 3'];
-const ESTADOS = ['Pendiente','En curso','Completada','Cancelada'];
+const ESTADOS = ['Pendiente','En curso','Completada','Cancelada','Suspendida','Fallecimiento'];
+const ESPECIALIDADES = ['Cirugía General','Cirugía Oncológica','Ortopedia y Traumatología','Ginecología y Obstetricia','Urología','Neurocirugía','Cirugía Plástica','Oftalmología','Otorrinolaringología','Cardiocirugía','Cirugía Vascular','Gastroenterología','Pediatría Quirúrgica'];
+const TIPOS_QX = ['Programada','Programada espontánea','Urgente'];
+// ── CAPACIDAD QUIRÚRGICA POR TURNO ─────────────────────────────────────────
+// Salas que se pueden atender con el personal de cada turno.
+// Ajusta aquí los horarios si cambian (formato 24 h, en orden del día).
+// Los turnos se enciman 30 min por la entrega de turno: ese tiempo se asigna
+// al turno SALIENTE, para que cada minuto del día se cuente una sola vez.
+const TURNOS = [
+  {nombre:'Matutino',   inicio:'07:00', fin:'14:30', salas:3},
+  {nombre:'Vespertino', inicio:'14:00', fin:'21:00', salas:2},
+  {nombre:'Nocturno',   inicio:'20:30', fin:'07:30', salas:1},
+];
+// Ventana efectiva de cada turno = desde que termina el turno anterior hasta su propio fin
+TURNOS.forEach((t,i)=>{ const prev=TURNOS[(i+TURNOS.length-1)%TURNOS.length]; t.efIni = prev.fin; t.efFin = t.fin; });
+const OPC_CIR_SEGURA = ['Completa','Incompleta','No aplica'];
+// Normaliza el valor de Hoja de Cirugía Segura que llega de Sheets ("completa ", "COMPLETA", "Sí"…)
+function normCS(v){
+  const t=(v==null?'':String(v)).trim().toLowerCase();
+  if(!t) return '';
+  if(t==='completa'||t==='si'||t==='sí'||t==='true') return 'Completa';
+  if(t==='incompleta'||t==='no') return 'Incompleta';
+  if(t==='no aplica'||t==='n/a'||t==='na') return 'No aplica';
+  return String(v).trim();
+}
+function normEstado(v){
+  const t=(v==null?'':String(v)).trim().toLowerCase();
+  const m={'pendiente':'Pendiente','en curso':'En curso','en-curso':'En curso','completada':'Completada','realizada':'Completada','cancelada':'Cancelada','suspendida':'Suspendida','fallecimiento':'Fallecimiento'};
+  return m[t]||String(v||'').trim();
+}
+function normEsp(v){
+  const t=(v==null?'':String(v)).trim().replace(/\s+/g,' ');
+  if(!t) return '';
+  const hit=ESPECIALIDADES.find(e=>e.localeCompare(t,'es',{sensitivity:'base'})===0);
+  return hit||t;
+}
+function esCancelOSusp(r){ const e=normEstado(r.estado); return e==='Cancelada'||e==='Suspendida'; }
+// Duración entre dos horas; admite cirugías que cruzan la medianoche (hasta 12 h)
+function durMin(ini,fin){
+  if(!ini||!fin) return null;
+  let d=pH(fin)-pH(ini);
+  if(d<0 && d+1440<=720) d+=1440;
+  return d>0 ? d : null;
+}
+// ID único aunque dos equipos registren al mismo tiempo (antes era max+1 y podía repetirse)
+function nuevoId(){
+  let id=Date.now();
+  while(DB.some(x=>Number(x.id)===id)) id++;
+  return id;
+}
+const esRealizada = r => { const e=normEstado(r.estado); return e==='Completada'||e==='Fallecimiento'; };
+// Datos que se completan al TERMINAR la cirugía
+const CAMPOS_CIERRE = [
+  ['horaReal','Hora real de inicio'],['horaFin','Hora real de fin'],['tipoQx','Tipo de cirugía'],
+  ['especialidad','Especialidad'],['lateralidad','Lateralidad'],['cirujano','Cirujano'],
+  ['anestesiologo','Anestesiólogo'],['instrumentista','Instrumentista'],
+  ['cirugiaSegura','Hoja de Cirugía Segura'],['eventoAdverso','Evento adverso'],['piezaPat','Pieza patológica']
+];
+function faltaCierre(r){
+  if(!esRealizada(r)) return [];
+  const f=CAMPOS_CIERRE.filter(([k])=>!String(r[k]??'').trim()).map(([,l])=>l);
+  if(r.eventoAdverso==='Sí'&&!String(r.eventoAdversoDesc||'').trim()) f.push('Descripción del evento adverso');
+  if(r.piezaPat==='Sí'&&!r.piezaDestino) f.push('Destino de la pieza');
+  if(r.horaReal&&r.horaFin&&!durMin(r.horaReal,r.horaFin)) f.push('Horas reales inválidas (fin antes que inicio)');
+  return f;
+}
+// Cirugía que ya debió terminar (hora programada + duración + 60 min de margen) y sigue Pendiente / En curso
+function vencida(r){
+  const e=normEstado(r.estado); if(e!=='Pendiente'&&e!=='En curso') return false;
+  const f=r.fecha||r._fecha; if(!f||!r.hora) return false;
+  const fin=new Date(f+'T00:00:00'); fin.setMinutes(pH(r.hora)+(Number(r.duracion)||60)+60);
+  return fin < new Date();
+}
+const porCerrar = r => vencida(r) || faltaCierre(r).length>0;
+// Reintervención: otra cirugía REALIZADA del mismo expediente en los 30 días previos
+function esReinRec(r){
+  if(!r||!r.expediente||!esRealizada(r)) return false;
+  const fm=x=>new Date((x.fecha||x._fecha)+'T12:00').getTime(), f=fm(r);
+  return DB.some(o=>String(o.id)!==String(r.id)&&o.expediente===r.expediente&&esRealizada(o)&&(o.fecha||o._fecha)&&
+    (fm(o)<f||(fm(o)===f&&pH(o.horaReal||o.hora)<pH(r.horaReal||r.hora)))&&(f-fm(o))<=30*86400000);
+}
+const nomPac = r => String((r&&r.paciente)||'Sin nombre').split(',')[0];
+
+function escAttr(v){ return String(v==null?'':v).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;'); }
 const SH = 32;
 
 let diaDB = {}, DB = [];
@@ -481,8 +567,6 @@ async function cargarDatos(){
     DB = Array.isArray(data) ? data : [];
     nid = DB.length ? Math.max(...DB.map(x=>Number(x.id)||0))+1 : 1;
     diaDB={};
-    // Guardar snapshot de DB actual antes de reemplazar (para merge)
-    const dbAnterior = [...DB];
     DB.forEach(r=>{
       if(r.fecha) r.fecha = r.fecha.toString().split('T')[0];
       if(r._fecha) r._fecha = r._fecha.toString().split('T')[0];
@@ -503,18 +587,15 @@ async function cargarDatos(){
       r.horaReal = fixHora(r.horaReal);
       r.horaFin  = fixHora(r.horaFin);
       if(r.horaReal && r.horaFin){
-        let dr = pH(r.horaFin) - pH(r.horaReal);
-        if(dr < 0) dr += 1440;
-        if(dr > 0) r.duracionReal = dr;
+        const dr = durMin(r.horaReal, r.horaFin);
+        if(dr) r.duracionReal = dr;
       }
-      // Merge: si el registro existía localmente con estado diferente,
-      // preservar el estado local (puede ser más reciente que Sheets)
-      const local = dbAnterior.find(x=>String(x.id)===String(r.id));
-      if(local && local.estado !== r.estado){
-        // El local tiene cambio — reenviar update silencioso a Sheets
-        r.estado = local.estado;
-        apiCall({action:'update', record:{...r, estado:local.estado}}).catch(()=>{});
-      }
+      // Normalizar valores que pueden llegar con mayúsculas/espacios distintos desde Sheets
+      r.cirugiaSegura = normCS(r.cirugiaSegura);
+      r.estado = normEstado(r.estado);
+      r.especialidad = normEsp(r.especialidad);
+      if(r.cirujano) r.cirujano = corregirNombre(r.cirujano);
+      if(r.duracion!==''&&r.duracion!=null) r.duracion = Number(r.duracion)||60;
       const f=r.fecha||r._fecha;
       if(f){if(!diaDB[f])diaDB[f]=[];diaDB[f].push(r);}
     });
@@ -587,8 +668,8 @@ function calcDuracionReal(){
   const fin = document.getElementById('f-hora-fin').value;
   const campo = document.getElementById('f-duracion-real');
   if(ini && fin){
-    const diff = pH(fin) - pH(ini);
-    if(diff > 0){
+    const diff = durMin(ini,fin);
+    if(diff){
       campo.value = diff;
       campo.style.color = 'var(--verde)';
       campo.style.fontWeight = '600';
@@ -640,7 +721,7 @@ function dC(s){
 function dCFor(s,eid,hora,dur,qx,est){
   if(est==='cancelada'||est==='Cancelada') return [];
   const sT=pH(hora),eT=sT+dur;
-  return s.filter(o=>o.id!==eid&&o.qx===qx&&o.estado!=='cancelada'&&o.estado!=='Cancelada'&&sT<pH(o.hora)+o.duracion&&pH(o.hora)<eT);
+  return s.filter(o=>String(o.id)!==String(eid)&&o.qx===qx&&o.estado!=='cancelada'&&o.estado!=='Cancelada'&&sT<pH(o.hora)+o.duracion&&pH(o.hora)<eT);
 }
 
 function badgeEst(e){
@@ -712,7 +793,7 @@ function rBanner(s,cf){
   // Banner traslapes
   let bannerHTML = '';
   if(cf.size && pairs.length){
-    bannerHTML += '<div class="alert-banner"><span class="alert-icon">⚠️</span><div><div class="alert-title">'+pairs.length+' traslape'+(pairs.length>1?'s':'')+' detectado'+(pairs.length>1?'s':'')+'</div>'+pairs.map(p=>'<div class="alert-item">· <b>'+p.a.qx+'</b>: '+p.a.paciente.split(',')[0]+' ('+p.a.hora+') y '+p.b.paciente.split(',')[0]+' ('+p.b.hora+')</div>').join('')+'</div></div>';
+    bannerHTML += '<div class="alert-banner"><span class="alert-icon">⚠️</span><div><div class="alert-title">'+pairs.length+' traslape'+(pairs.length>1?'s':'')+' detectado'+(pairs.length>1?'s':'')+'</div>'+pairs.map(p=>'<div class="alert-item">· <b>'+p.a.qx+'</b>: '+nomPac(p.a)+' ('+p.a.hora+') y '+nomPac(p.b)+' ('+p.b.hora+')</div>').join('')+'</div></div>';
   }
   // Banner insumos pendientes
   const insPend = s.filter(function(sg){
@@ -722,6 +803,11 @@ function rBanner(s,cf){
   });
   if(insPend.length){
     bannerHTML += '<div class="alert-insumos" style="background:#FEF3C7;border:1px solid #F59E0B;border-radius:var(--r);padding:10px 14px;margin-bottom:10px;display:flex;align-items:flex-start;gap:10px;font-size:13px"><span class="alert-icon">📦</span><div><div style="font-weight:600;color:#92400E;margin-bottom:3px">'+insPend.length+' cirugía'+(insPend.length>1?'s':'')+' con insumos especiales pendientes de confirmar</div>'+insPend.map(function(sg){ return '<div style="font-size:12px;color:#78350F;line-height:1.5">· <b>'+sg.qx+'</b> '+sg.hora+' — '+(sg.paciente||'').split(',')[0]+' 📦 '+sg.insumos+' / '+sg.proveedor+'</div>'; }).join('')+'</div></div>';
+  }
+  // Banner cirugías pendientes de cierre
+  const pc = s.filter(porCerrar);
+  if(pc.length){
+    bannerHTML += '<div style="background:#EFF6FF;border:1px solid #93C5FD;border-radius:var(--r);padding:10px 14px;margin-bottom:10px;display:flex;align-items:flex-start;gap:10px;font-size:13px"><span class="alert-icon">📝</span><div><div style="font-weight:600;color:#1E3A8A;margin-bottom:3px">'+pc.length+' cirugía'+(pc.length>1?'s':'')+' pendiente'+(pc.length>1?'s':'')+' de cierre</div>'+pc.map(function(sg){ const f=faltaCierre(sg); return '<div style="font-size:12px;color:#1E40AF;line-height:1.5;cursor:pointer" onclick="openDetail('+sg.id+')">· <b>'+sg.qx+'</b> '+sg.hora+' — '+nomPac(sg)+' · '+(vencida(sg)?'ya debió terminar y sigue '+normEstado(sg.estado):'falta: '+f.slice(0,4).join(', ')+(f.length>4?' (+'+(f.length-4)+')':''))+'</div>'; }).join('')+'</div></div>';
   }
   el.innerHTML = bannerHTML;
   actualizarBadgeInsumos();
@@ -737,7 +823,8 @@ function rStats(s,cf){
     `<div class="stat"><div class="stat-lbl">En curso</div><div class="stat-val c-az">${c['en-curso']}</div></div>`+
     `<div class="stat"><div class="stat-lbl">Completadas</div><div class="stat-val c-verde">${c.completada}</div></div>`+
     `<div class="stat"><div class="stat-lbl">Canceladas</div><div class="stat-val c-rojo">${c.cancelada}</div></div>`+
-    `<div class="stat"><div class="stat-lbl">Traslapes</div><div class="stat-val c-rojo">${nc}</div></div>`;
+    `<div class="stat"><div class="stat-lbl">Traslapes</div><div class="stat-val c-rojo">${nc}</div></div>`+
+    `<div class="stat"><div class="stat-lbl">Por cerrar</div><div class="stat-val c-amarillo">${s.filter(porCerrar).length}</div></div>`;
 }
 
 function rTL(s,cf){
@@ -768,13 +855,13 @@ function rTL(s,cf){
 function rCards(s,cf){
   const el=document.getElementById('cardsList');
   if(!s.length){el.innerHTML='<div class="empty"><div class="empty-icon">📅</div><p>Sin cirugías programadas para este día</p></div>';return}
-  el.innerHTML=[...s].sort((a,b)=>a.hora.localeCompare(b.hora)).map(sg=>{
+  el.innerHTML=[...s].sort((a,b)=>(a.hora||'').localeCompare(b.hora||'')).map(sg=>{
     const isc=cf.has(sg.id);
     const durReal = sg.duracionReal ? `<span>⏱ Real: ${sg.duracionReal} min</span>` : '';
     return `<div class="cx-card${isc?' conflict':''}" onclick="openDetail(${sg.id})">
       <div class="cx-top">
         <span class="cx-pac">${sg.cirujano||'—'}<span class="qx-tag">${sg.qx}</span>${isc?'<span class="badge b-traslape" style="margin-left:6px">⚠ Traslape</span>':''}</span>
-        ${badgeEst(sg.estado)}
+        <span>${porCerrar(sg)?'<span class="badge b-pendiente" style="margin-right:4px">📝 Por cerrar</span>':''}${badgeEst(sg.estado)}</span>
       </div>
       <div style="font-size:12px;color:var(--gris5);margin-bottom:4px">${sg.tipo||'—'}</div>
       <div class="cx-meta">
@@ -804,18 +891,27 @@ function openDetail(id){
   const sg=gS().find(x=>String(x.id)===String(id)); if(!sg) return;
   const cf=dC(gS()),isc=cf.has(sg.id);
   const others=isc?dCFor(gS(),id,sg.hora,sg.duracion||60,sg.qx,sg.estado):[];
-  const reinDB=DB.filter(r=>r.expediente&&r.expediente===sg.expediente);
-  const isRein=reinDB.length>1;
+  const reinDB=DB.filter(r=>r.expediente&&r.expediente===sg.expediente&&esRealizada(r));
+  const isRein=esReinRec(sg);
   const durRealHTML = sg.duracionReal
     ? `<span class="dur-real-chip">✓ ${sg.duracionReal} min reales</span>`
     : '<span style="color:var(--gris4);font-size:12px">—</span>';
   document.getElementById('modalContent').innerHTML=
     `<div class="modal-title">${sg.paciente||'Sin nombre'}<button class="modal-close" onclick="closeModal()">×</button></div>`+
-    (isc&&others.length?`<div class="conflict-warn">⚠ Traslape con: ${others.map(o=>o.paciente.split(',')[0]+' ('+o.hora+')').join(', ')}</div>`:'')+
-    (isRein?`<div style="background:var(--morado3);border:1px solid #D8B4FE;border-radius:8px;padding:10px 12px;margin-bottom:12px;font-size:12px;color:var(--morado)">🔄 Reintervención detectada — expediente ${sg.expediente} aparece ${reinDB.length} veces en la base de datos</div>`:'')+
+    (isc&&others.length?`<div class="conflict-warn">⚠ Traslape con: ${others.map(o=>nomPac(o)+' ('+o.hora+')').join(', ')}</div>`:'')+
+    (isRein?`<div style="background:var(--morado3);border:1px solid #D8B4FE;border-radius:8px;padding:10px 12px;margin-bottom:12px;font-size:12px;color:var(--morado)">🔄 Reintervención detectada — expediente ${sg.expediente} tiene otra cirugía realizada en los 30 días previos (${reinDB.length} realizadas en total)</div>`:'')+
     `<div style="margin-bottom:8px">${badgeEst(sg.estado)}</div>`+
     `<div class="sbtns">${ESTADOS.map(e=>`<button class="sbtn ${e.toLowerCase().replace(' ','-')}${sg.estado===e?' active-s':''}" onclick="requirePin(()=>chSt(${id},'${e}'))">${e}</button>`).join('')}</div>`+
+    `<div style="background:${sg.cirugiaSegura==='Completa'?'var(--verde3)':sg.cirugiaSegura?'#FEF9C3':'var(--rojo3)'};border:1.5px solid ${sg.cirugiaSegura==='Completa'?'var(--verde2)':sg.cirugiaSegura?'#F59E0B':'var(--rojo2)'};border-radius:10px;padding:10px 12px;margin:0 0 12px">
+      <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;margin-bottom:6px">✅ Hoja de Cirugía Segura ${sg.cirugiaSegura?'— '+sg.cirugiaSegura:'— sin capturar'}</div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap">${OPC_CIR_SEGURA.map(o=>`<button class="sbtn ${o==='Completa'?'completada':o==='Incompleta'?'pendiente':'cancelada'}${sg.cirugiaSegura===o?' active-s':''}" onclick="requirePin(()=>setCampoRapido(${id},'cirugiaSegura','${o}'))">${o}</button>`).join('')}</div>
+      <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;margin:10px 0 6px">⚠️ Evento adverso ${sg.eventoAdverso?'— '+sg.eventoAdverso:'— sin capturar'}</div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap">${['No','Sí'].map(o=>`<button class="sbtn ${o==='No'?'completada':'cancelada'}${sg.eventoAdverso===o?' active-s':''}" onclick="requirePin(()=>setCampoRapido(${id},'eventoAdverso','${o}'))">${o}</button>`).join('')}</div>
+      ${sg.eventoAdverso==='Sí'?`<div style="font-size:12px;margin-top:6px">${sg.eventoAdversoDesc||'<i>Sin descripción — agrégala en ✏ Editar</i>'}</div>`:''}
+    </div>`+
     `<div class="dm-row"><span class="dm-lbl">Quirófano</span><span>${sg.qx}</span></div>`+
+    `<div class="dm-row"><span class="dm-lbl">Tipo de cirugía</span><span>${sg.tipoQx||'—'}</span></div>`+
+    `<div class="dm-row"><span class="dm-lbl">Especialidad</span><span>${sg.especialidad||'<span style="color:var(--rojo2)">Sin especialidad</span>'}</span></div>`+
     `<div class="dm-row"><span class="dm-lbl">N° Expediente</span><span style="font-family:'DM Mono',monospace">${sg.expediente||'—'}</span></div>`+
     `<div class="dm-row"><span class="dm-lbl">Cirugía</span><span>${sg.tipo||'—'}</span></div>`+
     `<div class="dm-row"><span class="dm-lbl">Hora / Dur. estimada</span><span>${sg.hora} · ${sg.duracion||'—'} min</span></div>`+
@@ -857,8 +953,15 @@ function openDetail(id){
 async function chSt(id,est){
   const s=gS(),sg=s.find(x=>String(x.id)===String(id));
   if(sg){
+    if((est==='Cancelada'||est==='Suspendida')&&!String(sg.motivo||'').trim()){
+      const m=prompt('Motivo de '+(est==='Cancelada'?'cancelación':'suspensión')+':');
+      if(m===null) return;
+      sg.motivo=m.trim();
+      const quien=prompt('¿Quién '+(est==='Cancelada'?'cancela':'suspende')+'? (opcional)')||'';
+      sg.personalCancel=quien.trim();
+    }
     sg.estado=est;sS(s);
-    const idx=DB.findIndex(x=>String(x.id)===String(id));if(idx>-1)DB[idx].estado=est;
+    const idx=DB.findIndex(x=>String(x.id)===String(id));if(idx>-1){DB[idx].estado=est;DB[idx].motivo=sg.motivo||'';DB[idx].personalCancel=sg.personalCancel||'';}
     showLoader('💾 Actualizando…');
     // Enviar el registro COMPLETO, no solo el estado, para evitar pérdida de datos
     const recCompleto = DB.find(x=>String(x.id)===String(id)) || sg;
@@ -875,7 +978,25 @@ async function chSt(id,est){
       toast(res2&&res2.ok ? 'Estatus actualizado ✓' : '⚠ Guardado localmente — verifica conexión', res2&&res2.ok?'success':'error');
     }
   }
+  render();
+  // Al marcar Completada / Fallecimiento se abre directamente el formulario de cierre
+  if(sg && (est==='Completada'||est==='Fallecimiento') && faltaCierre(sg).length){ openForm(sg,true); return; }
+  openDetail(id);
+}
+
+async function setCampoRapido(id,campo,valor){
+  const s=gS(), sg=s.find(x=>String(x.id)===String(id)); if(!sg) return;
+  sg[campo]=valor; if(campo==='eventoAdverso'&&valor==='No') sg.eventoAdversoDesc='';
+  sS(s);
+  const idx=DB.findIndex(x=>String(x.id)===String(id)); if(idx>-1){ DB[idx][campo]=valor; if(campo==='eventoAdverso'&&valor==='No') DB[idx].eventoAdversoDesc=''; }
+  const rec=DB.find(x=>String(x.id)===String(id))||sg;
+  showLoader('💾 Guardando…');
+  let res=await apiCall({action:'update',record:{...rec}});
+  if(!res||!res.ok){ await new Promise(r=>setTimeout(r,1500)); res=await apiCall({action:'update',record:{...rec}}); }
+  hideLoader();
+  toast(res&&res.ok?'Guardado ✓':'⚠ Guardado localmente — verifica conexión', res&&res.ok?'success':'error');
   openDetail(id); render();
+  if(document.getElementById('page-base').classList.contains('active')) renderTabla();
 }
 
 async function delSg(id){
@@ -914,43 +1035,26 @@ async function guardarEnDB(id){
   hideLoader(); closeModal();
 }
 
-function openEdit(id){ openForm(gS().find(x=>String(x.id)===String(id))||{}); }
+function openEdit(id){ const sg=gS().find(x=>String(x.id)===String(id))||{}; openForm(sg, faltaCierre(sg).length>0); }
 
-function openForm(sg){
+function openForm(sg, modoCierre=false){
   sg=sg||{}; const isN=!sg.id;
+  const falt=faltaCierre(sg);
   const sgHoraNorm = normHora(sg.hora);
-  const hOpts=HORAS30.map(h=>`<option value="${h}"${sgHoraNorm===h?' selected':''}>${h}</option>`).join('');
+  const horasLista = (sgHoraNorm && !HORAS30.includes(sgHoraNorm)) ? [...HORAS30, sgHoraNorm].sort() : HORAS30;
+  const hOpts=horasLista.map(h=>`<option value="${h}"${sgHoraNorm===h?' selected':''}>${h}</option>`).join('');
   const latOpts=['','N/A','Derecha','Izquierda','Bilateral'].map(l=>`<option value="${l}"${sg.lateralidad===l?' selected':''}>${l||'— Selecciona —'}</option>`).join('');
   const durR = sg.duracionReal || '';
   document.getElementById('modalContent').innerHTML=
     `<div class="modal-title">${isN?'Nueva cirugía':'Editar cirugía'}<button class="modal-close" onclick="closeModal()">×</button></div>`+
+    (modoCierre&&falt.length?`<div style="background:#FEF3C7;border:1.5px solid #F59E0B;border-radius:10px;padding:10px 12px;margin-bottom:12px;font-size:12px;color:#78350F"><b>📝 Cierre de cirugía — faltan ${falt.length} dato${falt.length!==1?'s':''}:</b><br>${falt.join(' · ')}</div>`:'')+
     `<div class="form-cw" id="ecw"></div>`+
-    `<div class="form-grid" style="gap:10px;margin-bottom:10px">
-      <div class="form-group"><label>Quirófano</label><select id="eq" onchange="chkCf(${sg.id||0})">${QXS.map(q=>`<option${sg.qx===q?' selected':''}>${q}</option>`).join('')}</select></div>
-      <div class="form-group"><label>Estado</label><select id="ee">${ESTADOS.map(e=>`<option value="${e}"${sg.estado===e?' selected':''}>${e}</option>`).join('')}</select></div>
-      <div class="form-group"><label>Hora programada</label><select id="eh" onchange="chkCf(${sg.id||0})">${hOpts}</select></div>
-      <div class="form-group"><label>Duración estimada (min)</label><input id="ed" type="number" min="15" step="15" value="${sg.duracion||60}" oninput="chkCf(${sg.id||0})"></div>
-      <div class="form-group"><label>Hora real inicio</label><input type="time" id="ehr" value="${sg.horaReal||''}" onchange="calcDuracionRealModal()" style="font-family:'DM Mono',monospace"></div>
-      <div class="form-group"><label>Hora real fin</label><input type="time" id="ehf" value="${sg.horaFin||''}" onchange="calcDuracionRealModal()" style="font-family:'DM Mono',monospace"></div>
-      <div class="form-group"><label>Duración real (min)</label><input id="edurreal" type="number" value="${durR}" readonly style="background:var(--gris1);color:var(--verde);font-weight:600;cursor:default" placeholder="Calculada automáticamente"></div>
-      <div class="form-group"><label>Especialidad</label><select id="eesp">${['','Cirugía General','Cirugía Oncológica','Ortopedia y Traumatología','Ginecología y Obstetricia','Urología','Neurocirugía','Cirugía Plástica','Oftalmología','Otorrinolaringología','Cardiocirugía','Cirugía Vascular','Gastroenterología','Pediatría Quirúrgica'].map(e=>`<option value="${e}"${sg.especialidad===e?' selected':''}>${e||'— Selecciona —'}</option>`).join('')}</select></div>
-      <div class="form-group"><label>Lateralidad</label><select id="elat">${latOpts}</select></div>
-      <div class="form-group"><label>N° Expediente</label><input id="eexp" value="${sg.expediente||''}"></div>
-      <div class="form-group full"><label>Paciente</label><input id="ep" value="${sg.paciente||''}"></div>
-      <div class="form-group full"><label>Procedimiento</label><input id="et" value="${sg.tipo||''}"></div>
-      <div class="form-group"><label>Cirujano</label><select id="ec">${getCirujanoOpts(sg.cirujano||'')}</select><div style="display:flex;gap:6px;margin-top:5px"><input type="text" id="ec-nuevo" placeholder="Nuevo cirujano…" style="flex:1;font-size:12px;padding:6px 9px"><button type="button" onclick="agregarCirujanoModal()" class="btn btn-ghost btn-sm" style="white-space:nowrap;font-size:12px">+ Añadir</button></div></div>
-      <div class="form-group"><label>Anestesiólogo</label><input id="ea" value="${sg.anestesiologo||''}"></div>
-      <div class="form-group"><label>Instrumentista</label><input id="ei" value="${sg.instrumentista||''}"></div>
-      <div class="form-group"><label>Insumos / Material</label><input id="em" value="${sg.insumos||''}"></div>
-      <div class="form-group"><label>Proveedor</label><input id="eprov" value="${sg.proveedor||''}"></div>
-      <div class="form-group"><label>Personal que Programa</label><input id="epersonal" value="${sg.personal||''}"></div>
-    </div>`+
-    `<div style="font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--gris4);padding:10px 0 8px;border-bottom:1px solid var(--gris2);margin-bottom:10px">Indicadores de calidad</div>`+
+    `<div style="font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--gris4);padding:10px 0 8px;border-bottom:1px solid var(--gris2);margin-bottom:10px">Indicadores de calidad — Hoja de Cirugía Segura</div>`+
     `<div class="form-grid" style="gap:10px;margin-bottom:10px">
       <div class="form-group"><label>Hoja de Cirugía Segura</label>
         <select id="ecirugiasegura">
           <option value="">— Selecciona —</option>
-          ${['Completa','Incompleta','No aplica'].map(o=>`<option value="${o}"${sg.cirugiaSegura===o?' selected':''}>${o}</option>`).join('')}
+          ${OPC_CIR_SEGURA.map(o=>`<option value="${o}"${normCS(sg.cirugiaSegura)===o?' selected':''}>${o}</option>`).join('')}
         </select>
       </div>
       <div class="form-group"><label>Evento Adverso</label>
@@ -964,6 +1068,31 @@ function openForm(sg){
         <label>Descripción del Evento Adverso</label>
         <input id="eeventoadversodesc" value="${sg.eventoAdversoDesc||''}" placeholder="Describa el evento adverso ocurrido">
       </div>
+    </div>`+
+
+    `<div class="form-grid" style="gap:10px;margin-bottom:10px">
+      <div class="form-group"><label>Fecha</label><input type="date" id="efecha" value="${sg.fecha||sg._fecha||dk(cur)}" onchange="chkCf(${sg.id||0})"></div>
+      <div class="form-group"><label>Quirófano</label><select id="eq" onchange="chkCf(${sg.id||0})">${QXS.map(q=>`<option${sg.qx===q?' selected':''}>${q}</option>`).join('')}</select></div>
+      <div class="form-group"><label>Estado</label><select id="ee" onchange="toggleMotivoModal()">${ESTADOS.map(e=>`<option value="${e}"${normEstado(sg.estado)===e?' selected':''}>${e}</option>`).join('')}</select></div>
+      <div class="form-group"><label>Tipo de cirugía</label><select id="etipoqx"><option value="">— Selecciona —</option>${[...new Set([...TIPOS_QX, ...(sg.tipoQx&&!TIPOS_QX.includes(sg.tipoQx)?[sg.tipoQx]:[])])].map(t=>`<option value="${escAttr(t)}"${sg.tipoQx===t?' selected':''}>${t}</option>`).join('')}</select></div>
+      <div class="form-group"><label>Hora programada</label><select id="eh" onchange="chkCf(${sg.id||0})">${hOpts}</select></div>
+      <div class="form-group"><label>Duración estimada (min)</label><input id="ed" type="number" min="15" step="15" value="${sg.duracion||60}" oninput="chkCf(${sg.id||0})"></div>
+      <div class="form-group"><label>Hora real inicio</label><input type="time" id="ehr" value="${sg.horaReal||''}" onchange="calcDuracionRealModal()" style="font-family:'DM Mono',monospace"></div>
+      <div class="form-group"><label>Hora real fin</label><input type="time" id="ehf" value="${sg.horaFin||''}" onchange="calcDuracionRealModal()" style="font-family:'DM Mono',monospace"></div>
+      <div class="form-group"><label>Duración real (min)</label><input id="edurreal" type="number" value="${durR}" readonly style="background:var(--gris1);color:var(--verde);font-weight:600;cursor:default" placeholder="Calculada automáticamente"></div>
+      <div class="form-group"><label>Especialidad</label><select id="eesp">${['',...ESPECIALIDADES, ...(sg.especialidad&&!ESPECIALIDADES.includes(sg.especialidad)?[sg.especialidad]:[])].map(e=>`<option value="${escAttr(e)}"${(sg.especialidad||'')===e?' selected':''}>${e||'— Selecciona —'}</option>`).join('')}</select></div>
+      <div class="form-group"><label>Lateralidad</label><select id="elat">${latOpts}</select></div>
+      <div class="form-group"><label>N° Expediente</label><input id="eexp" value="${sg.expediente||''}"></div>
+      <div class="form-group full"><label>Paciente</label><input id="ep" value="${sg.paciente||''}"></div>
+      <div class="form-group full"><label>Procedimiento</label><input id="et" value="${sg.tipo||''}"></div>
+      <div class="form-group"><label>Cirujano</label><select id="ec">${getCirujanoOpts(sg.cirujano||'')}</select><div style="display:flex;gap:6px;margin-top:5px"><input type="text" id="ec-nuevo" placeholder="Nuevo cirujano…" style="flex:1;font-size:12px;padding:6px 9px"><button type="button" onclick="agregarCirujanoModal()" class="btn btn-ghost btn-sm" style="white-space:nowrap;font-size:12px">+ Añadir</button></div></div>
+      <div class="form-group"><label>Anestesiólogo</label><input id="ea" value="${sg.anestesiologo||''}"></div>
+      <div class="form-group"><label>Instrumentista</label><input id="ei" value="${sg.instrumentista||''}"></div>
+      <div class="form-group"><label>Insumos / Material</label><input id="em" value="${sg.insumos||''}"></div>
+      <div class="form-group"><label>Proveedor</label><input id="eprov" value="${sg.proveedor||''}"></div>
+      <div class="form-group"><label>Personal que Programa</label><input id="epersonal" value="${escAttr(sg.personal)}"></div>
+      <div class="form-group full" id="emotivo-wrap" style="display:${esCancelOSusp(sg)?'flex':'none'};flex-direction:column;gap:3px"><label>Motivo de cancelación / suspensión</label><input id="emotivo" value="${escAttr(sg.motivo)}" placeholder="Ej. Paciente no apto, falta de insumos, decisión del cirujano…"></div>
+      <div class="form-group full" id="epcancel-wrap" style="display:${esCancelOSusp(sg)?'flex':'none'};flex-direction:column;gap:3px"><label>Personal que cancela</label><input id="epcancel" value="${escAttr(sg.personalCancel)}"></div>
     </div>`+
     `<div style="font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--gris4);padding:10px 0 8px;border-bottom:1px solid var(--gris2);margin-bottom:10px">Pieza Patológica</div>`+
     `<div class="form-grid-3" style="gap:10px;margin-bottom:10px">
@@ -1006,8 +1135,8 @@ function calcDuracionRealModal(){
   const campo = document.getElementById('edurreal');
   if(!campo) return;
   if(ini && fin){
-    const diff = pH(fin) - pH(ini);
-    if(diff > 0){ campo.value = diff; }
+    const diff = durMin(ini,fin);
+    if(diff){ campo.value = diff; }
     else { campo.value = ''; }
   } else { campo.value = ''; }
 }
@@ -1016,9 +1145,15 @@ function chkCf(eid){
   const h=document.getElementById('eh')?.value,dur=parseInt(document.getElementById('ed')?.value)||60;
   const q=document.getElementById('eq')?.value,e=document.getElementById('ee')?.value;
   const w=document.getElementById('ecw'); if(!w||!h||!q) return;
-  const cl=dCFor(gS(),eid,h,dur,q,e);
-  if(cl.length){w.textContent='⚠ Traslape con: '+cl.map(o=>o.paciente.split(',')[0]+' ('+o.hora+', '+o.duracion+' min)').join(', ');w.classList.add('vis')}
-  else w.classList.remove('vis');
+  const fSel=document.getElementById('efecha')?.value||dk(cur), delDia=diaDB[fSel]||[];
+  const cl=dCFor(delDia,eid,h,dur,q,e);
+  const LIMP=40, ini=pH(h), fin=ini+dur;
+  const cerca=(e==='Cancelada'||e==='Suspendida')?[]:delDia.filter(o=>String(o.id)!==String(eid)&&o.qx===q&&!esCancelOSusp(o)&&!cl.includes(o)&&(
+    (pH(o.hora)>=fin&&pH(o.hora)-fin<LIMP) || (ini>=pH(o.hora)+(Number(o.duracion)||60)&&ini-(pH(o.hora)+(Number(o.duracion)||60))<LIMP)));
+  const msg=[];
+  if(cl.length) msg.push('⚠ Traslape con: '+cl.map(o=>nomPac(o)+' ('+o.hora+', '+o.duracion+' min)').join(', '));
+  if(cerca.length) msg.push('🧹 Menos de '+LIMP+' min de limpieza con: '+cerca.map(o=>nomPac(o)+' ('+o.hora+')').join(', '));
+  w.innerHTML=msg.join('<br>'); w.classList.toggle('vis', msg.length>0);
 }
 
 async function saveFrm(id){
@@ -1026,7 +1161,7 @@ async function saveFrm(id){
   const ini = document.getElementById('ehr').value;
   const fin = document.getElementById('ehf').value;
   let durReal = null;
-  if(ini && fin){ const d = pH(fin)-pH(ini); if(d>0) durReal=d; }
+  durReal = durMin(ini,fin);
   // Recuperar registro original para preservar campos que no están en el modal de edición
   // (motivo, personalCancel, tipoQx, etc.)
   const original = s.find(x=>String(x.id)===String(id)) || DB.find(x=>String(x.id)===String(id)) || {};
@@ -1034,8 +1169,8 @@ async function saveFrm(id){
     // Preservar todos los campos del original primero
     ...original,
     // Sobreescribir solo los campos que sí están en el modal de edición
-    id:id||nid++,
-    fecha:dk(cur), _fecha:dk(cur),
+    id:id||nuevoId(),
+    fecha:(document.getElementById('efecha')?.value||dk(cur)), _fecha:(document.getElementById('efecha')?.value||dk(cur)),
     paciente:document.getElementById('ep').value.trim()||'Sin nombre',
     tipo:document.getElementById('et').value.trim()||'Sin especificar',
     qx:document.getElementById('eq').value,
@@ -1055,6 +1190,9 @@ async function saveFrm(id){
     proveedor:document.getElementById('eprov').value.trim(),
     personal:document.getElementById('epersonal').value.trim(),
     cirugiaSegura:document.getElementById('ecirugiasegura').value,
+    tipoQx:document.getElementById('etipoqx').value,
+    motivo:(document.getElementById('emotivo')?.value||'').trim(),
+    personalCancel:(document.getElementById('epcancel')?.value||'').trim(),
     eventoAdverso:document.getElementById('eeventoadverso').value,
     eventoAdversoDesc:document.getElementById('eeventoadversodesc')?.value.trim()||'',
     piezaPat:document.getElementById('epiezapat').value,
@@ -1066,22 +1204,35 @@ async function saveFrm(id){
     insumosConfirmadoPor: original.insumosConfirmadoPor || '',
     insumosConfirmadoFecha: original.insumosConfirmadoFecha || '',
   };
+  const faltan = faltaCierre(d);
+  if(faltan.length && !confirm('La cirugía está como "'+d.estado+'" pero faltan datos de cierre:\n\n• '+faltan.join('\n• ')+'\n\n¿Guardar de todos modos?')) return;
+  if(esCancelOSusp(d) && !d.motivo && !confirm('No registraste el motivo de '+(d.estado==='Cancelada'?'cancelación':'suspensión')+'. ¿Guardar de todos modos?')) return;
+  if(d.eventoAdverso==='No') d.eventoAdversoDesc='';
+  if(d.piezaPat!=='Sí'){ d.piezaDesc=''; d.piezaDestino=''; d.piezaPatologo=''; }
   asegurarCirujanoEnCatalogo(d.cirujano);
   showLoader('💾 Guardando…');
+  const enviar = async (action) => { let r=await apiCall({action,record:d}); if(!r||!r.ok){ await new Promise(x=>setTimeout(x,1500)); r=await apiCall({action,record:d}); } return r&&r.ok; };
   if(id){
-    const i=s.findIndex(x=>String(x.id)===String(id));if(i>-1)s[i]=d;sS(s);
+    const i=s.findIndex(x=>String(x.id)===String(id));
+    if(d.fecha!==dk(cur)){
+      // Reprogramada a otro día: sacarla del día actual y ponerla en el nuevo
+      if(i>-1) s.splice(i,1); sS(s);
+      (diaDB[d.fecha]=diaDB[d.fecha]||[]).push(d);
+    } else { if(i>-1)s[i]=d; sS(s); }
     const idx=DB.findIndex(x=>String(x.id)===String(id));if(idx>-1)DB[idx]=d;
-    await apiCall({action:'update',record:d});
-    toast('Cirugía actualizada');
+    const ok=await enviar('update');
+    toast(ok?'Cirugía actualizada ✓':'⚠ Guardado localmente — verifica conexión', ok?'success':'error');
   } else {
-    d.id=nid++; s.push(d);sS(s);DB.push(d);
-    await apiCall({action:'save',record:d});
-    toast('Cirugía registrada ✓');
+    d.id=nuevoId(); (diaDB[d.fecha]=diaDB[d.fecha]||[]).push(d); DB.push(d);
+    const ok=await enviar('save');
+    toast(ok?'Cirugía registrada ✓':'⚠ Guardado localmente — verifica conexión', ok?'success':'error');
   }
   hideLoader(); closeModal(); render();
+  if(document.getElementById('page-base').classList.contains('active')) renderTabla();
+  if(document.getElementById('page-concentrado').classList.contains('active')) renderConcentrado();
 }
 
-const hoy=new Date().toISOString().split('T')[0];
+const hoy=dk(new Date());
 document.getElementById('f-fecha').value=hoy;
 
 function toggleCancel(){
@@ -1101,6 +1252,11 @@ function togglePiezaPatModal(){
   document.getElementById('epiezadesc-wrap').style.display=show?'flex':'none';
   document.getElementById('epiezadestino-wrap').style.display=show?'flex':'none';
   document.getElementById('epiezapatologo-wrap').style.display=show?'flex':'none';
+}
+function toggleMotivoModal(){
+  const e=document.getElementById('ee').value, show=(e==='Cancelada'||e==='Suspendida');
+  document.getElementById('emotivo-wrap').style.display=show?'flex':'none';
+  document.getElementById('epcancel-wrap').style.display=show?'flex':'none';
 }
 function toggleEventoAdversoModal(){
   const val=document.getElementById('eeventoadverso').value;
@@ -1130,6 +1286,23 @@ function limpiarForm(){
   document.getElementById('pieza-patologo-wrap').style.display='none';
 }
 
+function chkCfRegistro(){
+  const w=document.getElementById('form-cw'); if(!w) return;
+  const f=document.getElementById('f-fecha').value, q=document.getElementById('f-sala').value, h=document.getElementById('f-hora').value;
+  const dur=parseInt(document.getElementById('f-duracion').value)||60;
+  if(!f||!q||!h){ w.classList.remove('vis'); return; }
+  const delDia=diaDB[f]||[];
+  const cl=dCFor(delDia,-1,h,dur,q,document.getElementById('f-estatus').value);
+  const LIMP=40, ini=pH(h), fin=ini+dur;
+  const cerca=delDia.filter(o=>o.qx===q&&!esCancelOSusp(o)&&!cl.includes(o)&&(
+    (pH(o.hora)>=fin&&pH(o.hora)-fin<LIMP) || (ini>=pH(o.hora)+(Number(o.duracion)||60)&&ini-(pH(o.hora)+(Number(o.duracion)||60))<LIMP)));
+  const msg=[];
+  if(cl.length) msg.push('⚠ Traslape con: '+cl.map(o=>nomPac(o)+' ('+o.hora+', '+o.duracion+' min)').join(', '));
+  if(cerca.length) msg.push('🧹 Menos de '+LIMP+' min de limpieza con: '+cerca.map(o=>nomPac(o)+' ('+o.hora+')').join(', '));
+  w.innerHTML=msg.join('<br>'); w.classList.toggle('vis', msg.length>0);
+}
+['f-fecha','f-sala','f-hora','f-duracion','f-estatus'].forEach(id=>{ const el=document.getElementById(id); if(el){ el.addEventListener('change',chkCfRegistro); el.addEventListener('input',chkCfRegistro); } });
+
 function guardarCirugia(){
   const req=['f-fecha','f-sala','f-hora','f-paciente','f-procedimiento','f-cirujano','f-estatus'];
   for(const id of req){
@@ -1141,9 +1314,17 @@ function guardarCirugia(){
   const ini = document.getElementById('f-hora-real').value;
   const fin = document.getElementById('f-hora-fin').value;
   let durReal = null;
-  if(ini && fin){ const d = pH(fin)-pH(ini); if(d>0) durReal=d; }
+  durReal = durMin(ini,fin);
+  const fNueva=document.getElementById('f-fecha').value, qNueva=document.getElementById('f-sala').value;
+  const hNueva=document.getElementById('f-hora').value, dNueva=parseInt(document.getElementById('f-duracion').value)||60;
+  const delDia=(diaDB[fNueva]||[]);
+  const tras=dCFor(delDia,-1,hNueva,dNueva,qNueva,document.getElementById('f-estatus').value);
+  if(tras.length && !confirm('⚠ Traslape en '+qNueva+' con: '+tras.map(o=>nomPac(o)+' ('+o.hora+')').join(', ')+'\n\n¿Guardar de todos modos?')) return;
+  const expN=document.getElementById('f-expediente').value.trim().toUpperCase(), pacN=document.getElementById('f-paciente').value.trim().toLowerCase();
+  const dup=delDia.find(o=>!esCancelOSusp(o)&&((expN&&o.expediente===expN)||(o.paciente||'').trim().toLowerCase()===pacN));
+  if(dup && !confirm('Ya existe una cirugía ese día para este paciente ('+dup.qx+' '+dup.hora+' — '+(dup.tipo||'')+').\n\n¿Registrar otra?')) return;
   const rec={
-    id:nid++,
+    id:nuevoId(),
     fecha:document.getElementById('f-fecha').value,
     sala:document.getElementById('f-sala').value,
     qx:document.getElementById('f-sala').value,
@@ -1197,7 +1378,7 @@ function guardarCirugia(){
   render();
 }
 
-function esRein(exp){ return exp&&DB.filter(r=>r.expediente===exp).length>1; }
+function esRein(exp){ return exp&&DB.filter(r=>r.expediente===exp&&esRealizada(r)).length>1; }
 
 function renderTabla(){
   const ff=document.getElementById('fil-fecha').value;
@@ -1207,9 +1388,9 @@ function renderTabla(){
   let data=[...DB].filter(r=>
     (!ff||r.fecha===ff||r._fecha===ff)&&
     (!fs||r.sala===fs||r.qx===fs)&&
-    (!fe||r.estado===fe)&&
+    (!fe||(fe==='__cierre'?porCerrar(r):normEstado(r.estado)===fe))&&
     (!fb||(r.expediente||'').toLowerCase().includes(fb)||(r.paciente||'').toLowerCase().includes(fb))
-  ).sort((a,b)=>(a.fecha||a._fecha||'').localeCompare(b.fecha||b._fecha||'')||a.hora.localeCompare(b.hora));
+  ).sort((a,b)=>(a.fecha||a._fecha||'').localeCompare(b.fecha||b._fecha||'')||(a.hora||'').localeCompare(b.hora||''));
   document.getElementById('total-reg').textContent=DB.length;
   const tbody=document.getElementById('tabla-body');
   const empty=document.getElementById('tabla-empty');
@@ -1218,7 +1399,7 @@ function renderTabla(){
   tbody.innerHTML=data.map(r=>{
     const fd=r.fecha||r._fecha||'';
     const fechaFmt=fd?new Date(fd+'T12:00').toLocaleDateString('es-MX',{day:'2-digit',month:'short',year:'numeric'}):'—';
-    const rein=esRein(r.expediente);
+    const rein=esReinRec(r);
     const durRealCell = r.duracionReal
       ? `<span class="dur-real-chip">✓ ${r.duracionReal} min</span>`
       : '—';
@@ -1236,7 +1417,7 @@ function renderTabla(){
       <td style="font-family:'DM Mono',monospace;font-size:11px">${r.horaReal||'—'}</td>
       <td style="font-family:'DM Mono',monospace;font-size:11px">${r.horaFin||'—'}</td>
       <td style="text-align:center">${durRealCell}</td>
-      <td>${badgeEst(r.estado)}</td>
+      <td>${badgeEst(r.estado)}${porCerrar(r)?`<div title="${escAttr(vencida(r)?'Ya debió terminar':'Falta: '+faltaCierre(r).join(', '))}" style="font-size:10px;color:#B45309;margin-top:2px">📝 por cerrar</div>`:''}</td>
       <td>${rein?'<span class="badge b-si">Sí</span>':'<span class="badge b-no">No</span>'}</td>
       <td>${r.cirugiaSegura
         ? `<span class="badge ${r.cirugiaSegura==='Completa'?'b-completada':r.cirugiaSegura==='Incompleta'?'b-traslape':'b-cancelada'}">${r.cirugiaSegura}</span>`
@@ -1249,9 +1430,20 @@ function renderTabla(){
             ? '<span class="badge b-completada" title="'+( r.insumosConfirmadoPor||'')+' · '+(r.insumosConfirmadoFecha||'')+'">✅ Confirmado</span>'
             : '<span class="badge b-traslape">📦 Pendiente</span>')
         : '—'}</td>
-      <td><button class="btn btn-ghost btn-sm" style="color:var(--rojo2)" onclick="eliminarDB(${r.id})">✕</button></td>
+      <td style="white-space:nowrap"><button class="btn btn-ghost btn-sm" title="Editar" onclick="editarDesdeBD(${r.id})">✏</button><button class="btn btn-ghost btn-sm" style="color:var(--rojo2)" title="Eliminar" onclick="eliminarDB(${r.id})">✕</button></td>
     </tr>`;
   }).join('');
+}
+
+function editarDesdeBD(id){
+  const r=DB.find(x=>String(x.id)===String(id)); if(!r) return;
+  const f=r.fecha||r._fecha; if(!f){ toast('El registro no tiene fecha','error'); return; }
+  requirePin(()=>{
+    cur=new Date(f+'T12:00:00'); cur.setHours(0,0,0,0);
+    if(!diaDB[f]) diaDB[f]=[];
+    if(!diaDB[f].some(x=>String(x.id)===String(id))) diaDB[f].push(r);
+    openForm(diaDB[f].find(x=>String(x.id)===String(id)));
+  });
 }
 
 async function eliminarDB(id){
@@ -1271,9 +1463,9 @@ function limpFiltros(){
 
 function exportarCSV(){
   if(!DB.length){toast('Sin datos para exportar','error');return}
-  const cols=['fecha','qx','hora','horaReal','horaFin','duracionReal','expediente','paciente','tipo','tipoQx','especialidad','lateralidad','cirujano','anestesiologo','instrumentista','duracion','estado','cirugiaSegura','eventoAdverso','eventoAdversoDesc','piezaPat','piezaDesc','piezaDestino','piezaPatologo','insumos','proveedor','personal','motivo','personalCancel'];
-  const hdrs=['Fecha','Quirófano','Hora Prog.','Hora Real Inicio','Hora Real Fin','Duración Real (min)','N° Expediente','Paciente','Procedimiento','Tipo Cirugía','Especialidad','Lateralidad','Cirujano','Anestesiólogo','Instrumentista','Duración Est. (min)','Estatus','Hoja Cir. Segura','Evento Adverso','Desc. Evento Adverso','Pieza Patológica','Desc. Pieza','Destino Pieza','Patólogo / Lab.','Insumos','Proveedor','Personal','Motivo Cancelación','Personal Cancela'];
-  const csv=[hdrs.join(','),...DB.map(r=>cols.map(c=>`"${(r[c]||'').toString().replace(/"/g,'""')}"`).join(','))].join('\n');
+  const cols=['id','fecha','qx','hora','horaReal','horaFin','duracionReal','expediente','paciente','tipo','tipoQx','especialidad','lateralidad','cirujano','anestesiologo','instrumentista','duracion','estado','cirugiaSegura','eventoAdverso','eventoAdversoDesc','piezaPat','piezaDesc','piezaDestino','piezaPatologo','insumos','proveedor','personal','motivo','personalCancel','insumosConfirmado','insumosConfirmadoPor','insumosConfirmadoFecha'];
+  const hdrs=['ID','Fecha','Quirófano','Hora Prog.','Hora Real Inicio','Hora Real Fin','Duración Real (min)','N° Expediente','Paciente','Procedimiento','Tipo Cirugía','Especialidad','Lateralidad','Cirujano','Anestesiólogo','Instrumentista','Duración Est. (min)','Estatus','Hoja Cir. Segura','Evento Adverso','Desc. Evento Adverso','Pieza Patológica','Desc. Pieza','Destino Pieza','Patólogo / Lab.','Insumos','Proveedor','Personal','Motivo Cancelación','Personal Cancela','Insumos Confirmados','Confirmó Insumos','Fecha Confirmación'];
+  const csv=[hdrs.join(','),...DB.map(r=>cols.map(c=>`"${(r[c]??'').toString().replace(/"/g,'""')}"`).join(','))].join('\n');
   const a=document.createElement('a');
   a.href='data:text/csv;charset=utf-8,\uFEFF'+encodeURIComponent(csv);
   a.download=`qx_${new Date().toISOString().split('T')[0]}.csv`;
@@ -1294,213 +1486,297 @@ function renderConcentrado(){
     const fd=r.fecha||r._fecha;
     if(!fd) return;
     const d=new Date(fd+'T12:00');
-    if(d.getFullYear()===anio&&d.getMonth()===mes&&!allRecs.find(x=>x.id===r.id)) allRecs.push(r);
+    if(d.getFullYear()===anio&&d.getMonth()===mes&&!allRecs.find(x=>String(x.id)===String(r.id))) allRecs.push(r);
   });
 
   const programadas = allRecs.length;
-  const realizadas  = allRecs.filter(r=>{const e=(r.estado||'').toLowerCase();return e==='completada'||e==='realizada';});
-  const canceladas  = allRecs.filter(r=>(r.estado||'').toLowerCase()==='cancelada');
+  const est = r => normEstado(r.estado);
+  // "Realizadas" = la cirugía sí se llevó a cabo (Completada o Fallecimiento)
+  const realizadas  = allRecs.filter(r=>est(r)==='Completada'||est(r)==='Fallecimiento');
+  const canceladas  = allRecs.filter(r=>est(r)==='Cancelada');
+  const suspendidas = allRecs.filter(r=>est(r)==='Suspendida');
+  const activas     = allRecs.filter(r=>!esCancelOSusp(r)); // todo lo que no se canceló ni suspendió
+  const nR = realizadas.length;
+  const pct = (n,d) => d ? Math.round(n/d*1000)/10 : null;
+  const showPct = v => v===null ? 'N/D' : v+'%';
 
   const diasUnicos = [...new Set(allRecs.map(r=>r.fecha||r._fecha).filter(Boolean))];
   const numDias    = diasUnicos.length || 1;
 
   // ── 1. UTILIZACIÓN DE QUIRÓFANO ──────────────────────────────────────────
-  const totalMinUsados = realizadas.reduce((s,r)=>s+(r.duracionReal||r.duracion||0),0);
-  const minDisponibles = 24*60 * 3 * numDias;
+  // Disponible = Σ (salas con personal × horas del turno) × días del periodo.
+  // Usado = minutos reales de cirugía realizada, repartidos en el turno en que ocurrieron.
+  const durTurno = t => { let d=pH(t.efFin)-pH(t.efIni); if(d<=0) d+=1440; return d; };
+  const minDispDia = TURNOS.reduce((a,t)=>a+durTurno(t)*t.salas,0);
+  const hoyD = new Date(); hoyD.setHours(0,0,0,0);
+  const diasMes = new Date(anio, mes+1, 0).getDate();
+  const esMesActual = anio===hoyD.getFullYear() && mes===hoyD.getMonth();
+  const esFuturo = new Date(anio,mes,1) > hoyD;
+  const diasPeriodo = esFuturo ? 0 : esMesActual ? hoyD.getDate() : diasMes; // mes en curso: hasta hoy
+  const minDisponibles = minDispDia * diasPeriodo;
+  // Reparto de cada cirugía en los turnos (minuto a minuto por intervalos)
+  const usoTurno = TURNOS.map(()=>0);
+  let totalMinUsados = 0, sinHoraReal = 0;
+  realizadas.forEach(r=>{
+    let ini, dur;
+    if(r.horaReal && Number(r.duracionReal)>0){ ini=pH(r.horaReal); dur=Number(r.duracionReal); }
+    else { ini=pH(r.hora); dur=Number(r.duracion)||0; sinHoraReal++; }
+    if(!dur) return;
+    totalMinUsados += dur;
+    TURNOS.forEach((t,i)=>{
+      const ti=pH(t.efIni), tf=ti+durTurno(t);
+      // se revisa el día de la cirugía y el ciclo anterior/siguiente (turno nocturno cruza medianoche)
+      [-1440,0,1440].forEach(off=>{ const a=Math.max(ini,ti+off), b=Math.min(ini+dur,tf+off); if(b>a) usoTurno[i]+=b-a; });
+    });
+  });
   const pctUtil = minDisponibles ? Math.round(totalMinUsados/minDisponibles*1000)/10 : 0;
+  const pctTurno = TURNOS.map((t,i)=>{ const disp=durTurno(t)*t.salas*diasPeriodo; return disp?Math.round(usoTurno[i]/disp*1000)/10:0; });
 
-  // ── 2. INICIO PUNTUAL ────────────────────────────────────────────────────
-  const conHoraReal = allRecs.filter(r=>r.hora&&r.horaReal);
-  const puntuales   = conHoraReal.filter(r=>pH(r.horaReal)<=pH(r.hora)).length;
-  const pctPuntual  = conHoraReal.length ? Math.round(puntuales/conHoraReal.length*1000)/10 : null;
+  // ── 2. INICIO PUNTUAL (cirugías realizadas con hora real de inicio) ──────
+  const TOL_PUNTUAL = 0; // minutos de tolerancia; cámbialo (p. ej. 15) si la institución lo define así
+  const conHoraReal = realizadas.filter(r=>r.hora&&r.horaReal);
+  const puntuales   = conHoraReal.filter(r=>pH(r.horaReal)<=pH(r.hora)+TOL_PUNTUAL).length;
+  const pctPuntual  = pct(puntuales, conHoraReal.length);
   const retrasos    = conHoraReal.map(r=>Math.max(0,pH(r.horaReal)-pH(r.hora))).filter(d=>d>0);
   const promRet     = retrasos.length ? Math.round(retrasos.reduce((a,b)=>a+b,0)/retrasos.length) : 0;
+  // Primera cirugía del día por sala
+  const primeras = {};
+  conHoraReal.forEach(r=>{ const k=(r.qx||r.sala)+'|'+(r.fecha||r._fecha); if(!primeras[k]||pH(r.hora)<pH(primeras[k].hora)) primeras[k]=r; });
+  const primArr = Object.values(primeras);
+  const primPunt = primArr.filter(r=>pH(r.horaReal)<=pH(r.hora)+TOL_PUNTUAL).length;
+  const pctPrim = pct(primPunt, primArr.length);
 
-  // ── 3. CANCELACIÓN QUIRÚRGICA ────────────────────────────────────────────
-  const pctCancel = programadas ? Math.round(canceladas.length/programadas*1000)/10 : 0;
+  // ── 3. CANCELACIÓN Y SUSPENSIÓN ──────────────────────────────────────────
+  const pctCancel = pct(canceladas.length, programadas) ?? 0;
+  const pctSusp   = pct(suspendidas.length, programadas) ?? 0;
+  const motivos = {};
+  [...canceladas,...suspendidas].forEach(r=>{ const m=(r.motivo||'').trim()||'Sin motivo registrado'; const k=m.charAt(0).toUpperCase()+m.slice(1).toLowerCase(); motivos[k]=(motivos[k]||0)+1; });
+  const topMotivos = Object.entries(motivos).sort((a,b)=>b[1]-a[1]).slice(0,5);
 
   // ── 4. TIEMPO DE ROTACIÓN DE SALA ────────────────────────────────────────
-  // Base: cirugías COMPLETADAS con hora real de inicio Y fin registradas.
-  // Mide el intervalo real entre el fin de una cirugía completada y el inicio
-  // real de la siguiente cirugía completada, en el mismo quirófano y día.
-  // El tiempo de limpieza (40 min) está INCLUIDO en el intervalo.
-  // Un valor < 40 min es una alerta: no hubo margen suficiente para limpieza.
-  const LIMPIEZA = 40;
-  const rotaciones = [];
-  let paresInsuficientes = 0;
-
+  const LIMPIEZA = 40, MAX_ROT = 60;
+  const rotaciones = []; let paresInsuficientes = 0;
   const porSalaDia = {};
-  // Solo cirugías completadas con horaReal Y horaFin registradas
   realizadas.forEach(r => {
     if (!r.horaFin || !r.horaReal) return;
     const key = (r.qx || r.sala || '') + '|' + (r.fecha || r._fecha || '');
-    if (!porSalaDia[key]) porSalaDia[key] = [];
-    porSalaDia[key].push(r);
+    (porSalaDia[key] = porSalaDia[key] || []).push(r);
   });
-
-  // Intervalos > 240 min entre cirugías no son rotaciones reales (son huecos de
-  // programación o cambios de jornada) y se descartan del promedio.
-  const MAX_ROT = 60;
-
   Object.values(porSalaDia).forEach(grupo => {
     grupo.sort((a, b) => pH(a.horaReal) - pH(b.horaReal));
     for (let i = 0; i < grupo.length - 1; i++) {
-      const finAnt = pH(grupo[i].horaFin);
-      const iniSig = pH(grupo[i + 1].horaReal);
-      const rot    = iniSig - finAnt;
-      if (rot > 0 && rot <= MAX_ROT) {
-        rotaciones.push(rot);
-        if (rot < LIMPIEZA) paresInsuficientes++;
-      }
+      const rot = pH(grupo[i + 1].horaReal) - pH(grupo[i].horaFin);
+      if (rot > 0 && rot <= MAX_ROT) { rotaciones.push(rot); if (rot < LIMPIEZA) paresInsuficientes++; }
     }
   });
-
   const conHoraFinCompletas = realizadas.filter(r => r.horaFin && r.horaReal).length;
-
-  const promRot = rotaciones.length
-    ? Math.round(rotaciones.reduce((a, b) => a + b, 0) / rotaciones.length)
-    : null;
+  const promRot = rotaciones.length ? Math.round(rotaciones.reduce((a, b) => a + b, 0) / rotaciones.length) : null;
 
   // ── 5. REINTERVENCIONES ──────────────────────────────────────────────────
-  const expMes = [...new Set(allRecs.map(r=>r.expediente).filter(Boolean))];
-  const reinCount = expMes.filter(exp=>DB.filter(r=>r.expediente===exp).length>1).length;
-  const pctRein = programadas ? Math.round(reinCount/programadas*1000)/10 : 0;
+  // Cirugía realizada este mes cuyo expediente ya tenía OTRA cirugía realizada
+  // en los 30 días previos. Las canceladas/suspendidas y reprogramadas ya no cuentan.
+  const DIAS_REIN = 30;
+  const fechaMs = r => new Date((r.fecha||r._fecha)+'T12:00').getTime();
+  const realizadasDB = DB.filter(r=>{const e=normEstado(r.estado);return (e==='Completada'||e==='Fallecimiento')&&r.expediente&&(r.fecha||r._fecha);});
+  const reinRecs = realizadas.filter(r=>{
+    if(!r.expediente) return false;
+    const f=fechaMs(r);
+    return realizadasDB.some(o=>String(o.id)!==String(r.id)&&o.expediente===r.expediente&&
+      (fechaMs(o)<f||(fechaMs(o)===f&&pH(o.horaReal||o.hora)<pH(r.horaReal||r.hora)))&&
+      (f-fechaMs(o))<=DIAS_REIN*86400000);
+  });
+  const pctRein = pct(reinRecs.length, nR) ?? 0;
 
-  // ── MORTALIDAD ───────────────────────────────────────────────────────────
-  const fallecimientos = allRecs.filter(r=>(r.estado||'').toLowerCase()==='fallecimiento');
-  const pctMortalidad  = programadas ? Math.round(fallecimientos.length/programadas*1000)/10 : 0;
+  // ── 6. MORTALIDAD ────────────────────────────────────────────────────────
+  const fallecimientos = realizadas.filter(r=>est(r)==='Fallecimiento');
+  const pctMortalidad  = pct(fallecimientos.length, nR) ?? 0;
 
-  // ── CIRUGÍA SEGURA ───────────────────────────────────────────────────────
-  // Denominador = total de cirugías programadas (igual que Cancelación,
-  // Reintervenciones, Eventos Adversos y Mortalidad), NO solo las que
-  // tienen el campo capturado — de lo contrario una cirugía sin capturar
-  // simplemente no cuenta en contra y el % puede mostrar 100% aunque casi
-  // nada se haya registrado.
-  const conCirSegura    = allRecs.filter(r=>r.cirugiaSegura&&r.cirugiaSegura!=='');
-  const cirSeguraCompl  = allRecs.filter(r=>r.cirugiaSegura==='Completa');
-  const cirSeguraIncompl = conCirSegura.length - cirSeguraCompl.length;
-  const cirSeguraSinCapturar = allRecs.length - conCirSegura.length;
-  const pctCirSegura    = programadas ? Math.round(cirSeguraCompl.length/programadas*1000)/10 : null;
+  // ── 7. CIRUGÍA SEGURA ────────────────────────────────────────────────────
+  // Denominador = cirugías REALIZADAS a las que aplica la hoja (se excluyen
+  // canceladas, suspendidas, pendientes y las marcadas "No aplica").
+  // Las realizadas sin captura cuentan como NO cumplimiento.
+  const csNoAplica   = realizadas.filter(r=>normCS(r.cirugiaSegura)==='No aplica');
+  const csAplicables = realizadas.filter(r=>normCS(r.cirugiaSegura)!=='No aplica');
+  const csCompletas  = csAplicables.filter(r=>normCS(r.cirugiaSegura)==='Completa');
+  const csIncompl    = csAplicables.filter(r=>normCS(r.cirugiaSegura)==='Incompleta');
+  const csSinCapt    = csAplicables.filter(r=>!normCS(r.cirugiaSegura));
+  const pctCirSegura = pct(csCompletas.length, csAplicables.length);
+  const pendientesSinRealizar = allRecs.filter(r=>est(r)==='Pendiente'||est(r)==='En curso').length;
 
-  // ── EVENTO ADVERSO ───────────────────────────────────────────────────────
-  const eventosAdversos = allRecs.filter(r=>r.eventoAdverso==='Sí');
-  const pctEventos      = programadas ? Math.round(eventosAdversos.length/programadas*1000)/10 : 0;
+  // ── 8. EVENTOS ADVERSOS ──────────────────────────────────────────────────
+  const eventosAdversos = realizadas.filter(r=>r.eventoAdverso==='Sí');
+  const eaSinCapt = realizadas.filter(r=>!r.eventoAdverso).length;
+  const pctEventos = pct(eventosAdversos.length, nR) ?? 0;
+
+  // ── 9. URGENCIAS ─────────────────────────────────────────────────────────
+  const urgentes = activas.filter(r=>r.tipoQx==='Urgente');
+  const pctUrg = pct(urgentes.length, activas.length) ?? 0;
+
+  // ── 10. PRECISIÓN DE LA PROGRAMACIÓN (duración real vs estimada) ─────────
+  const conDur = realizadas.filter(r=>Number(r.duracionReal)>0&&Number(r.duracion)>0);
+  const dentro20 = conDur.filter(r=>Math.abs(r.duracionReal-r.duracion)<=r.duracion*0.2).length;
+  const exceden  = conDur.filter(r=>r.duracionReal>r.duracion*1.2).length;
+  const pctPrec  = pct(dentro20, conDur.length);
+  const desvProm = conDur.length ? Math.round(conDur.reduce((s,r)=>s+(r.duracionReal-r.duracion),0)/conDur.length) : 0;
+
+  // ── 11. TRAZABILIDAD DE PIEZA PATOLÓGICA ─────────────────────────────────
+  const piezas = realizadas.filter(r=>r.piezaPat==='Sí');
+  const piezasOk = piezas.filter(r=>r.piezaDesc&&r.piezaDestino&&(r.piezaDestino!=='Patología'||r.piezaPatologo));
+  const pctPieza = pct(piezasOk.length, piezas.length);
+
+  // ── 12. COMPLETITUD DEL REGISTRO ─────────────────────────────────────────
+  const contF = {};
+  realizadas.forEach(r=>faltaCierre(r).forEach(l=>contF[l]=(contF[l]||0)+1));
+  const faltantes = Object.entries(contF).sort((a,b)=>b[1]-a[1]);
+  const regCompletos = realizadas.filter(r=>!faltaCierre(r).length).length;
+  const pctCompleto = pct(regCompletos, nR);
 
   // ── TIPO DE CIRUGÍA ──────────────────────────────────────────────────────
   const porTipo = {};
-  allRecs.forEach(r=>{ const t=r.tipoQx||'Sin clasificar'; porTipo[t]=(porTipo[t]||0)+1; });
+  activas.forEach(r=>{ const t=r.tipoQx||'Sin clasificar'; porTipo[t]=(porTipo[t]||0)+1; });
 
-  // ── ESPECIALIDAD Y CIRUJANO ──────────────────────────────────────────────
-  const porEsp={}, porCir={};
-  allRecs.forEach(r=>{
-    if(r.especialidad){ porEsp[r.especialidad]=(porEsp[r.especialidad]||0)+1; }
-    if(r.cirujano){ porCir[r.cirujano]=(porCir[r.cirujano]||0)+1; }
+  // ── ESPECIALIDAD Y CIRUJANO (misma base: cirugías no canceladas/suspendidas) ──
+  // Nombres y especialidades se normalizan para que "dr. juan", "Dr. Juan " y
+  // "DR. JUAN" cuenten como la misma persona.
+  const porEsp={}, porCir={}, espDeCir={}, cirDeEsp={};
+  let sinEsp=0, sinCir=0;
+  activas.forEach(r=>{
+    const e=normEsp(r.especialidad), c=r.cirujano?corregirNombre(r.cirujano):'';
+    if(e) porEsp[e]=(porEsp[e]||0)+1; else sinEsp++;
+    if(c) porCir[c]=(porCir[c]||0)+1; else sinCir++;
+    if(c){ espDeCir[c]=espDeCir[c]||{}; const ek=e||'Sin especialidad'; espDeCir[c][ek]=(espDeCir[c][ek]||0)+1; }
+    if(e&&c){ cirDeEsp[e]=cirDeEsp[e]||new Set(); cirDeEsp[e].add(c); }
   });
+  const nAct = activas.length;
   const topEsp = Object.entries(porEsp).sort((a,b)=>b[1]-a[1]);
   const topCir = Object.entries(porCir).sort((a,b)=>b[1]-a[1]);
-  const espFrec = topEsp.length ? topEsp[0] : null;
-  const cirFrec = topCir.length ? topCir[0] : null;
+  const espPrincipal = c => { const o=Object.entries(espDeCir[c]||{}).sort((a,b)=>b[1]-a[1]); return o.length?o.map(([e,n])=>e+(o.length>1?' ('+n+')':'')).join(', '):'—'; };
   const promDiario = numDias ? Math.round(programadas/numDias*10)/10 : 0;
 
   // ── TARJETAS RESUMEN ─────────────────────────────────────────────────────
   document.getElementById('stats-grid').innerHTML=
-    `<div class="stat-card"><div class="stat-card-lbl">Cirugías en el mes</div><div class="stat-card-val c-az">${programadas}</div><div class="stat-card-sub">total programadas</div></div>`+
-    `<div class="stat-card"><div class="stat-card-lbl">Promedio diario</div><div class="stat-card-val c-az">${promDiario}</div><div class="stat-card-sub">cirugías por día activo</div></div>`+
-    `<div class="stat-card"><div class="stat-card-lbl">Completadas</div><div class="stat-card-val c-verde">${realizadas.length}</div><div class="stat-card-sub">${programadas?Math.round(realizadas.length/programadas*100):0}% del total</div></div>`+
-    `<div class="stat-card"><div class="stat-card-lbl">Canceladas</div><div class="stat-card-val c-rojo">${canceladas.length}</div><div class="stat-card-sub">${pctCancel}% del total</div></div>`;
+    `<div class="stat-card"><div class="stat-card-lbl">Programadas en el mes</div><div class="stat-card-val c-az">${programadas}</div><div class="stat-card-sub">${promDiario} por día activo</div></div>`+
+    `<div class="stat-card"><div class="stat-card-lbl">Realizadas</div><div class="stat-card-val c-verde">${nR}</div><div class="stat-card-sub">${programadas?Math.round(nR/programadas*100):0}% del total${allRecs.filter(vencida).length?` · ⚠ ${allRecs.filter(vencida).length} ya pasaron y siguen pendientes/en curso`:''}</div></div>`+
+    `<div class="stat-card"><div class="stat-card-lbl">Canceladas</div><div class="stat-card-val c-rojo">${canceladas.length}</div><div class="stat-card-sub">${pctCancel}% del total</div></div>`+
+    `<div class="stat-card"><div class="stat-card-lbl">Suspendidas</div><div class="stat-card-val" style="color:#9A3412">${suspendidas.length}</div><div class="stat-card-sub">${pctSusp}% del total</div></div>`;
 
-  function indCard(color, emoji, titulo, formula, valor, desc, barVal){
-    const pct = Math.min(barVal??0, 100);
+  function indCard(color, emoji, titulo, formula, valor, desc, barVal, extra=''){
+    const p = Math.max(0, Math.min(barVal??0, 100));
     return `<div class="ind-card">
-      <div class="ind-hdr"><div class="ind-dot" style="background:${color}"></div><span class="ind-ttl">${titulo}</span></div>
+      <div class="ind-hdr"><div class="ind-dot" style="background:${color}"></div><span class="ind-ttl">${emoji} ${titulo}</span></div>
       <div style="font-size:10px;color:var(--gris4);margin-bottom:8px;font-family:'DM Mono',monospace">${formula}</div>
       <div class="ind-val" style="color:${color}">${valor}</div>
       <div class="ind-desc">${desc}</div>
-      <div class="ind-bar"><div class="ind-fill" style="width:${pct}%;background:${color}"></div></div>
+      <div class="ind-bar"><div class="ind-fill" style="width:${p}%;background:${color}"></div></div>${extra}
     </div>`;
   }
+  const lista = (arr, fn, max=8) => arr.length ? `<div style="margin-top:8px;font-size:11px;line-height:1.6;max-height:140px;overflow:auto">${arr.slice(0,max).map(fn).join('')}${arr.length>max?`<div style="color:var(--gris4)">… y ${arr.length-max} más (ver Base de datos)</div>`:''}</div>` : '';
+  const filaCx = r => `<div>· <a href="#" onclick="editarDesdeBD(${r.id});return false" style="color:var(--az2)">${(r.fecha||r._fecha||'').slice(5)} ${r.qx||''} ${r.hora||''}</a> — ${(r.paciente||'').split(',')[0]} · ${r.cirujano||'sin cirujano'}</div>`;
+  const csColor = pctCirSegura===null ? 'var(--gris5)' : pctCirSegura>=95 ? 'var(--verde)' : pctCirSegura>=80 ? 'var(--naranja2)' : 'var(--rojo2)';
 
   document.getElementById('ind-grid').innerHTML=
-    indCard(
-      'var(--az2)', '📊',
-      'Utilización de Quirófano',
-      '(min utilizados / min disponibles) × 100',
+    indCard('var(--az2)', '📊', 'Utilización de Quirófano',
+      '(min de cirugía realizada / min disponibles con personal) × 100',
       pctUtil+'%',
-      `${totalMinUsados} min utilizados de ${minDisponibles.toLocaleString()} min disponibles (24 h × 3 salas × ${numDias} días)`,
-      pctUtil
+      `${Math.round(totalMinUsados/60)} h utilizadas de ${Math.round(minDisponibles/60).toLocaleString()} h disponibles · ${TURNOS.reduce((a,t)=>a+t.salas,0)} salas-turno al día (${TURNOS.map(t=>t.salas+' '+t.nombre.toLowerCase()).join(' + ')}) × ${diasPeriodo} día${diasPeriodo!==1?'s':''}${esMesActual?' (mes en curso, hasta hoy)':''} · los 30 min de entrega de turno se cuentan al turno saliente`
+        + (sinHoraReal ? ` · ${sinHoraReal} cirugía${sinHoraReal!==1?'s':''} sin hora real: se usó la hora y duración programadas` : ''),
+      pctUtil,
+      `<div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:10px">${TURNOS.map((t,i)=>`
+        <div style="flex:1;min-width:110px;background:var(--gris1);border-radius:8px;padding:8px 10px">
+          <div style="font-size:11px;color:var(--gris5)">${t.nombre} · ${t.salas} sala${t.salas!==1?'s':''}</div>
+          <div style="font-size:10px;color:var(--gris4)">${t.inicio}–${t.fin} · cuenta ${t.efIni}–${t.efFin}</div>
+          <div style="font-size:20px;font-weight:600;color:var(--az)">${pctTurno[i]}%</div>
+          <div style="font-size:10px;color:var(--gris4)">${Math.round(usoTurno[i]/60)} h de ${Math.round(durTurno(t)*t.salas*diasPeriodo/60)} h</div>
+          <div class="ind-bar" style="margin-top:4px"><div class="ind-fill" style="width:${Math.min(pctTurno[i],100)}%;background:${pctTurno[i]>100?'var(--rojo2)':'var(--az2)'}"></div></div>
+        </div>`).join('')}</div>`
     )+
-    indCard(
-      'var(--verde)', '🕑',
-      'Inicio Puntual de Cirugía',
-      '(iniciadas en horario / total programadas) × 100',
-      pctPuntual!==null ? pctPuntual+'%' : 'N/D',
+    indCard(csColor, '✅', 'Cumplimiento — Hoja de Cirugía Segura',
+      '(hojas completas / cirugías realizadas a las que aplica) × 100',
+      showPct(pctCirSegura),
+      nR
+        ? `${csCompletas.length} completas de ${csAplicables.length} cirugías realizadas`
+          + (csIncompl.length ? ` · ${csIncompl.length} incompleta${csIncompl.length!==1?'s':''}` : '')
+          + (csSinCapt.length ? ` · ⚠ ${csSinCapt.length} sin capturar (cuentan como no cumplidas)` : '')
+          + (csNoAplica.length ? ` · ${csNoAplica.length} "No aplica" excluidas` : '')
+          + (pendientesSinRealizar ? ` · ${pendientesSinRealizar} pendientes/en curso aún no se evalúan` : '')
+        : 'Aún no hay cirugías realizadas en el mes',
+      pctCirSegura??0,
+      (csSinCapt.length||csIncompl.length) ? `<div style="font-size:11px;font-weight:600;margin-top:8px">Por corregir (clic para editar):</div>`+lista([...csSinCapt,...csIncompl], filaCx) : ''
+    )+
+    indCard('var(--verde)', '🕑', 'Inicio Puntual de Cirugía',
+      `(realizadas que iniciaron a la hora programada${TOL_PUNTUAL?` +${TOL_PUNTUAL} min`:''} / realizadas con hora real) × 100`,
+      showPct(pctPuntual),
       conHoraReal.length
-        ? `${puntuales} de ${conHoraReal.length} cirugías iniciaron a tiempo · Retraso promedio: ${promRet} min`
+        ? `${puntuales} de ${conHoraReal.length} a tiempo · Retraso promedio: ${promRet} min · Primera cirugía del día a tiempo: ${showPct(pctPrim)} (${primPunt}/${primArr.length})`
         : 'Registra la hora real de inicio para calcular este indicador',
       pctPuntual??0
     )+
-    indCard(
-      'var(--rojo2)', '🚫',
-      'Cancelación Quirúrgica',
-      '(canceladas / programadas) × 100',
-      pctCancel+'%',
-      `${canceladas.length} cirugías canceladas de ${programadas} programadas`,
-      pctCancel
+    indCard('var(--rojo2)', '🚫', 'Cancelación y Suspensión',
+      '(canceladas / programadas) × 100 · (suspendidas / programadas) × 100',
+      `${pctCancel}% · ${pctSusp}%`,
+      `${canceladas.length} canceladas y ${suspendidas.length} suspendidas de ${programadas} programadas`,
+      pctCancel+pctSusp,
+      topMotivos.length ? `<div style="font-size:11px;font-weight:600;margin-top:8px">Motivos principales:</div>`+lista(topMotivos, ([m,n])=>`<div>· ${m}: <b>${n}</b></div>`) : ''
     )+
-    indCard(
-      'var(--naranja2)', '🔄',
-      'Índice de Rotación de Sala',
+    indCard('var(--naranja2)', '🔄', 'Índice de Rotación de Sala',
       'minutos promedio entre el fin de una cirugía y el inicio real de la siguiente · misma sala · mismo día',
       promRot !== null ? promRot + ' min' : 'N/D',
       rotaciones.length
-        ? `Base: ${conHoraFinCompletas} cirugías completadas con horas registradas (de ${realizadas.length} completadas) · ${rotaciones.length} transición${rotaciones.length > 1 ? 'es' : ''} válida${rotaciones.length > 1 ? 's' : ''}`
-          + (paresInsuficientes > 0
-              ? ` · ⚠ ${paresInsuficientes} transición${paresInsuficientes > 1 ? 'es' : ''} con < ${LIMPIEZA} min (sin margen de limpieza)`
-              : ` · ✓ Todas las transiciones superan los ${LIMPIEZA} min de limpieza requeridos`)
-        : `Sin transiciones calculables — se requieren cirugías completadas con hora real de inicio y fin en la misma sala y día`,
+        ? `Base: ${conHoraFinCompletas} realizadas con horas registradas · ${rotaciones.length} transición${rotaciones.length > 1 ? 'es' : ''} válida${rotaciones.length > 1 ? 's' : ''}`
+          + (paresInsuficientes > 0 ? ` · ⚠ ${paresInsuficientes} con < ${LIMPIEZA} min (sin margen de limpieza)` : ` · ✓ Todas superan los ${LIMPIEZA} min de limpieza`)
+        : 'Sin transiciones calculables — se requieren cirugías realizadas con hora real de inicio y fin en la misma sala y día',
       promRot !== null ? Math.min(promRot / MAX_ROT * 100, 100) : 0
     )+
-    indCard(
-      'var(--morado)', '🔁',
-      'Reintervenciones',
-      '(reintervenciones / total cirugías) × 100',
+    indCard('var(--morado)', '🔁', 'Reintervención no planeada (≤ 30 días)',
+      `(cirugías con otra cirugía realizada al mismo expediente en los ${DIAS_REIN} días previos / realizadas) × 100`,
       pctRein+'%',
-      `${reinCount} expediente${reinCount!==1?'s':''} con más de una cirugía registrada · ${programadas} cirugías totales`,
-      pctRein
+      `${reinRecs.length} de ${nR} cirugías realizadas · las canceladas o reprogramadas ya no cuentan como reintervención`,
+      pctRein*5,
+      lista(reinRecs, filaCx)
     )+
-    indCard(
-      programadas && cirSeguraSinCapturar>0 ? 'var(--rojo2)' : 'var(--verde)', '✅',
-      'Cumplimiento — Hoja de Cirugía Segura',
-      '(hojas completas / total de cirugías programadas) × 100',
-      pctCirSegura!==null ? pctCirSegura+'%' : 'N/D',
-      programadas
-        ? `${cirSeguraCompl.length} completas de ${programadas} cirugías`
-          + (cirSeguraIncompl>0 ? ` · ${cirSeguraIncompl} incompleta${cirSeguraIncompl!==1?'s':''} registrada${cirSeguraIncompl!==1?'s':''}` : '')
-          + (cirSeguraSinCapturar>0 ? ` · ⚠ ${cirSeguraSinCapturar} sin capturar` : '')
-        : 'Registra la Hoja de Cirugía Segura en cada procedimiento',
-      pctCirSegura??0
-    )+
-    indCard(
-      'var(--naranja)', '⚠️',
-      'Eventos Adversos',
-      '(eventos adversos / total cirugías) × 100',
+    indCard('var(--naranja)', '⚠️', 'Eventos Adversos',
+      '(eventos adversos / cirugías realizadas) × 100',
       pctEventos+'%',
-      eventosAdversos.length
-        ? `${eventosAdversos.length} evento${eventosAdversos.length!==1?'s':''} registrado${eventosAdversos.length!==1?'s':''} de ${programadas} cirugías`
-        : 'Sin eventos adversos registrados en el mes',
-      Math.min(pctEventos*5, 100)
+      (eventosAdversos.length ? `${eventosAdversos.length} evento${eventosAdversos.length!==1?'s':''} de ${nR} realizadas` : `Sin eventos adversos en ${nR} realizadas`)
+        + (eaSinCapt ? ` · ⚠ ${eaSinCapt} sin capturar` : ''),
+      Math.min(pctEventos*5, 100),
+      lista(eventosAdversos, r=>`<div>· ${(r.fecha||'').slice(5)} ${r.qx||''} — ${r.eventoAdversoDesc||'<i>sin descripción</i>'}</div>`)
     )+
-    indCard(
-      'var(--gris6)', '💀',
-      'Mortalidad Quirúrgica',
-      '(fallecimientos / total cirugías) × 100',
+    indCard('var(--gris6)', '💀', 'Mortalidad Quirúrgica (transoperatoria)',
+      '(estatus "Fallecimiento" / cirugías realizadas) × 100',
       pctMortalidad+'%',
-      fallecimientos.length
-        ? `${fallecimientos.length} fallecimiento${fallecimientos.length!==1?'s':''} de ${programadas} cirugías en el mes`
-        : 'Sin fallecimientos registrados en el mes',
+      fallecimientos.length ? `${fallecimientos.length} de ${nR} realizadas` : `Sin fallecimientos registrados en ${nR} realizadas`,
       Math.min(pctMortalidad*10, 100)
     )+
-    (programadas
+    indCard('var(--rojo)', '🚑', 'Cirugía de Urgencia',
+      '(cirugías urgentes / cirugías no canceladas) × 100',
+      pctUrg+'%',
+      `${urgentes.length} urgentes de ${nAct}` + (activas.filter(r=>!r.tipoQx).length ? ` · ⚠ ${activas.filter(r=>!r.tipoQx).length} sin tipo de cirugía` : ''),
+      pctUrg
+    )+
+    indCard('var(--az2)', '⏱', 'Precisión de la Programación',
+      '(cirugías con duración real dentro de ±20 % de la estimada / realizadas con duración real) × 100',
+      showPct(pctPrec),
+      conDur.length
+        ? `${dentro20} de ${conDur.length} dentro de rango · ${exceden} excedieron >20 % · desviación promedio ${desvProm>0?'+':''}${desvProm} min`
+        : 'Registra hora real de inicio y fin para calcular este indicador',
+      pctPrec??0
+    )+
+    indCard('var(--verde2)', '🧪', 'Trazabilidad de Pieza Patológica',
+      '(piezas con descripción, destino y patólogo/lab. / piezas obtenidas) × 100',
+      showPct(pctPieza),
+      piezas.length ? `${piezasOk.length} de ${piezas.length} piezas con registro completo` : 'Sin piezas patológicas registradas en el mes',
+      pctPieza??0,
+      lista(piezas.filter(r=>!piezasOk.includes(r)), filaCx)
+    )+
+    indCard(pctCompleto===null?'var(--gris5)':pctCompleto>=90?'var(--verde)':'var(--rojo2)', '📝', 'Completitud del Registro Quirúrgico',
+      '(cirugías realizadas con todos los datos de cierre / realizadas) × 100',
+      showPct(pctCompleto),
+      nR ? `${regCompletos} de ${nR} registros completos` : 'Aún no hay cirugías realizadas',
+      pctCompleto??0,
+      faltantes.length ? `<div style="font-size:11px;font-weight:600;margin-top:8px">Campos vacíos más frecuentes:</div>`+lista(faltantes, ([l,n])=>`<div>· ${l}: <b>${n}</b></div>`) : ''
+    )+
+    (nAct
       ? `<div class="ind-card" style="grid-column:1/-1">
           <div class="ind-hdr"><div class="ind-dot" style="background:var(--az2)"></div><span class="ind-ttl">Distribución por Tipo de Cirugía</span></div>
           <div style="display:flex;gap:16px;flex-wrap:wrap;margin-top:8px">
@@ -1508,36 +1784,40 @@ function renderConcentrado(){
               <div style="flex:1;min-width:120px">
                 <div style="font-size:11px;color:var(--gris5);margin-bottom:4px">${t}</div>
                 <div style="font-size:24px;font-weight:600;color:var(--az)">${n}</div>
-                <div style="font-size:11px;color:var(--gris4)">${Math.round(n/programadas*100)}% del total</div>
-                <div class="ind-bar" style="margin-top:6px"><div class="ind-fill" style="width:${Math.round(n/programadas*100)}%;background:var(--az2)"></div></div>
+                <div style="font-size:11px;color:var(--gris4)">${Math.round(n/nAct*100)}% de ${nAct}</div>
+                <div class="ind-bar" style="margin-top:6px"><div class="ind-fill" style="width:${Math.round(n/nAct*100)}%;background:var(--az2)"></div></div>
               </div>`).join('')}
           </div>
         </div>`
       : '')+
-    (espFrec
+    (topEsp.length||sinEsp
       ? `<div class="ind-card" style="grid-column:1/-1">
           <div class="ind-hdr"><div class="ind-dot" style="background:var(--az2)"></div><span class="ind-ttl">Especialidad más frecuente</span></div>
+          <div style="font-size:11px;color:var(--gris4);margin:2px 0 6px">Base: ${nAct} cirugías no canceladas/suspendidas · una especialidad suma a todos sus cirujanos, por eso puede no coincidir con el cirujano más frecuente</div>
+          ${sinEsp?`<div style="font-size:12px;color:var(--rojo2);margin-bottom:6px">⚠ ${sinEsp} cirugía${sinEsp!==1?'s':''} sin especialidad registrada (${Math.round(sinEsp/nAct*100)}%) — no se cuentan en ninguna especialidad</div>`:''}
           <div style="display:flex;gap:16px;flex-wrap:wrap;margin-top:8px">
             ${topEsp.slice(0,6).map(([e,n],i)=>`
               <div style="flex:1;min-width:140px">
                 <div style="font-size:11px;color:var(--gris5);margin-bottom:4px">${i===0?'🥇 ':''}${e}</div>
                 <div style="font-size:24px;font-weight:600;color:${i===0?'var(--az)':'var(--gris6)'}">${n}</div>
-                <div style="font-size:11px;color:var(--gris4)">${Math.round(n/programadas*100)}% del total</div>
-                <div class="ind-bar" style="margin-top:6px"><div class="ind-fill" style="width:${Math.round(n/programadas*100)}%;background:${i===0?'var(--az2)':'var(--gris3)'}"></div></div>
+                <div style="font-size:11px;color:var(--gris4)">${Math.round(n/nAct*100)}% · ${(cirDeEsp[e]||new Set()).size} cirujano${(cirDeEsp[e]||new Set()).size!==1?'s':''}</div>
+                <div class="ind-bar" style="margin-top:6px"><div class="ind-fill" style="width:${Math.round(n/nAct*100)}%;background:${i===0?'var(--az2)':'var(--gris3)'}"></div></div>
               </div>`).join('')}
           </div>
         </div>`
       : '')+
-    (cirFrec
+    (topCir.length
       ? `<div class="ind-card" style="grid-column:1/-1">
           <div class="ind-hdr"><div class="ind-dot" style="background:var(--verde2)"></div><span class="ind-ttl">Cirujano más frecuente</span></div>
+          <div style="font-size:11px;color:var(--gris4);margin:2px 0 6px">Base: ${nAct} cirugías no canceladas/suspendidas · debajo de cada nombre, la especialidad con la que se registraron sus cirugías</div>
+          ${sinCir?`<div style="font-size:12px;color:var(--rojo2);margin-bottom:6px">⚠ ${sinCir} cirugía${sinCir!==1?'s':''} sin cirujano registrado</div>`:''}
           <div style="display:flex;gap:16px;flex-wrap:wrap;margin-top:8px">
             ${topCir.slice(0,6).map(([c,n],i)=>`
               <div style="flex:1;min-width:140px">
                 <div style="font-size:11px;color:var(--gris5);margin-bottom:4px">${i===0?'🥇 ':''}${c}</div>
                 <div style="font-size:24px;font-weight:600;color:${i===0?'var(--verde)':'var(--gris6)'}">${n}</div>
-                <div style="font-size:11px;color:var(--gris4)">${Math.round(n/programadas*100)}% del total</div>
-                <div class="ind-bar" style="margin-top:6px"><div class="ind-fill" style="width:${Math.round(n/programadas*100)}%;background:${i===0?'var(--verde2)':'var(--gris3)'}"></div></div>
+                <div style="font-size:11px;color:var(--gris4)">${Math.round(n/nAct*100)}% · ${espPrincipal(c)}</div>
+                <div class="ind-bar" style="margin-top:6px"><div class="ind-fill" style="width:${Math.round(n/nAct*100)}%;background:${i===0?'var(--verde2)':'var(--gris3)'}"></div></div>
               </div>`).join('')}
           </div>
         </div>`
@@ -1578,7 +1858,11 @@ function saveCatalogoCirujanos(arr){
 }
 
 function getCirujanoOpts(selected){
-  const cat = getCatalogoCirujanos();
+  const cat = getCatalogoCirujanos().slice();
+  if(selected){
+    const hit = cat.find(c => c.toLowerCase() === corregirNombre(selected).toLowerCase());
+    if(hit) selected = hit; else cat.push(selected);
+  }
   const opts = ['<option value="">— Selecciona —</option>'];
   cat.forEach(c => {
     opts.push(`<option value="${c}"${c===selected?' selected':''}>${c}</option>`);
@@ -1672,6 +1956,12 @@ function sincronizarCatalogoDesdeBD(){
 
 // Inicializar con lo que haya en localStorage mientras carga Sheets
 poblarSelectCirujano('f-cirujano');
+
+(function initConcentrado(){
+  const h=new Date(), sa=document.getElementById('con-anio');
+  for(let y=2026;y<=h.getFullYear()+1;y++){ const o=document.createElement('option'); o.value=y; o.textContent=y; sa.appendChild(o); }
+  sa.value=h.getFullYear(); document.getElementById('con-mes').value=h.getMonth();
+})();
 
 render();
 cargarDatos();
