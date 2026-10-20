@@ -1091,8 +1091,15 @@ function openForm(sg, modoCierre=false){
       <div class="form-group"><label>Insumos / Material</label><input id="em" value="${sg.insumos||''}"></div>
       <div class="form-group"><label>Proveedor</label><input id="eprov" value="${sg.proveedor||''}"></div>
       <div class="form-group"><label>Personal que Programa</label><input id="epersonal" value="${escAttr(sg.personal)}"></div>
-      <div class="form-group full" id="emotivo-wrap" style="display:${esCancelOSusp(sg)?'flex':'none'};flex-direction:column;gap:3px"><label>Motivo de cancelación / suspensión</label><input id="emotivo" value="${escAttr(sg.motivo)}" placeholder="Ej. Paciente no apto, falta de insumos, decisión del cirujano…"></div>
-      <div class="form-group full" id="epcancel-wrap" style="display:${esCancelOSusp(sg)?'flex':'none'};flex-direction:column;gap:3px"><label>Personal que cancela</label><input id="epcancel" value="${escAttr(sg.personalCancel)}"></div>
+      <div class="form-group full" style="background:var(--gris1);border-radius:8px;padding:8px 10px">
+        <label style="display:flex;align-items:center;gap:8px;text-transform:none;font-size:12px"><input type="checkbox" id="einsconf" style="width:auto" ${sg.insumosConfirmado===true||sg.insumosConfirmado==='true'||sg.insumosConfirmado==='TRUE'?'checked':''}> Insumos especiales confirmados</label>
+        <div style="display:flex;gap:8px;margin-top:6px;flex-wrap:wrap">
+          <input id="einsconfpor" value="${escAttr(sg.insumosConfirmadoPor)}" placeholder="Confirmado por" style="flex:1;min-width:140px">
+          <input id="einsconffecha" value="${escAttr(sg.insumosConfirmadoFecha)}" placeholder="Fecha de confirmación" style="flex:1;min-width:140px">
+        </div>
+      </div>
+      <div class="form-group full" id="emotivo-wrap" style="display:${esCancelOSusp(sg)||sg.motivo?'flex':'none'};flex-direction:column;gap:3px"><label>Motivo de cancelación / suspensión</label><input id="emotivo" value="${escAttr(sg.motivo)}" placeholder="Ej. Paciente no apto, falta de insumos, decisión del cirujano…"></div>
+      <div class="form-group full" id="epcancel-wrap" style="display:${esCancelOSusp(sg)||sg.personalCancel?'flex':'none'};flex-direction:column;gap:3px"><label>Personal que cancela</label><input id="epcancel" value="${escAttr(sg.personalCancel)}"></div>
     </div>`+
     `<div style="font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--gris4);padding:10px 0 8px;border-bottom:1px solid var(--gris2);margin-bottom:10px">Pieza Patológica</div>`+
     `<div class="form-grid-3" style="gap:10px;margin-bottom:10px">
@@ -1174,6 +1181,7 @@ async function saveFrm(id){
     paciente:document.getElementById('ep').value.trim()||'Sin nombre',
     tipo:document.getElementById('et').value.trim()||'Sin especificar',
     qx:document.getElementById('eq').value,
+    sala:document.getElementById('eq').value,
     estado:document.getElementById('ee').value,
     hora:document.getElementById('eh').value,
     horaReal:ini,
@@ -1199,10 +1207,10 @@ async function saveFrm(id){
     piezaDesc:document.getElementById('epiezadesc')?.value.trim()||'',
     piezaDestino:document.getElementById('epiezadestino')?.value||'',
     piezaPatologo:document.getElementById('epiezapatologo')?.value.trim()||'',
-    // Preservar confirmación de insumos al editar
-    insumosConfirmado: original.insumosConfirmado || false,
-    insumosConfirmadoPor: original.insumosConfirmadoPor || '',
-    insumosConfirmadoFecha: original.insumosConfirmadoFecha || '',
+    // Confirmación de insumos (editable)
+    insumosConfirmado: document.getElementById('einsconf').checked,
+    insumosConfirmadoPor: document.getElementById('einsconf').checked ? document.getElementById('einsconfpor').value.trim() : '',
+    insumosConfirmadoFecha: document.getElementById('einsconf').checked ? (document.getElementById('einsconffecha').value.trim() || new Date().toLocaleString('es-MX')) : '',
   };
   const faltan = faltaCierre(d);
   if(faltan.length && !confirm('La cirugía está como "'+d.estado+'" pero faltan datos de cierre:\n\n• '+faltan.join('\n• ')+'\n\n¿Guardar de todos modos?')) return;
@@ -1254,7 +1262,7 @@ function togglePiezaPatModal(){
   document.getElementById('epiezapatologo-wrap').style.display=show?'flex':'none';
 }
 function toggleMotivoModal(){
-  const e=document.getElementById('ee').value, show=(e==='Cancelada'||e==='Suspendida');
+  const e=document.getElementById('ee').value, show=(e==='Cancelada'||e==='Suspendida'||document.getElementById('emotivo').value.trim()!=='');
   document.getElementById('emotivo-wrap').style.display=show?'flex':'none';
   document.getElementById('epcancel-wrap').style.display=show?'flex':'none';
 }
