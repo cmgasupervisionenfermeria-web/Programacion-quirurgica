@@ -516,6 +516,84 @@ function esReinRec(r){
 }
 const nomPac = r => String((r&&r.paciente)||'Sin nombre').split(',')[0];
 
+// ── REINTERVENCIONES: detalle comparativo ────────────────────────────
+const fechaDe = r => r.fecha||r._fecha||'';
+const msFecha = r => new Date(fechaDe(r)+'T12:00').getTime();
+const fFmt = f => f ? new Date(f+'T12:00').toLocaleDateString('es-MX',{day:'2-digit',month:'short',year:'numeric'}) : '—';
+// Cirugías realizadas del mismo expediente ANTES de r (más reciente primero)
+function cirugiasPrevias(r, dias){
+  if(!r||!r.expediente) return [];
+  const f=msFecha(r);
+  return DB.filter(o=>String(o.id)!==String(r.id)&&o.expediente===r.expediente&&esRealizada(o)&&fechaDe(o)&&
+      (msFecha(o)<f||(msFecha(o)===f&&pH(o.horaReal||o.hora)<pH(r.horaReal||r.hora)))&&
+      (dias==null||(f-msFecha(o))<=dias*86400000))
+    .sort((a,b)=>msFecha(b)-msFecha(a)||pH(b.horaReal||b.hora)-pH(a.horaReal||a.hora));
+}
+let REIN_LISTA = []; // ids de la lista abierta (para el botón "Volver al listado")
+
+function bloqueCx(r, titulo, color){
+  const fila=(l,v)=>`<div style="display:flex;justify-content:space-between;gap:12px;padding:5px 0;border-bottom:1px solid var(--gris1);font-size:12px"><span style="color:var(--gris4)">${l}</span><span style="text-align:right;${v?'':'color:var(--gris4)'}">${v||'Sin capturar'}</span></div>`;
+  const ea = r.eventoAdverso==='Sí' ? '⚠ Sí'+(r.eventoAdversoDesc?' — '+r.eventoAdversoDesc:'') : r.eventoAdverso;
+  const pieza = r.piezaPat==='Sí' ? 'Sí'+(r.piezaDesc?' — '+r.piezaDesc:'')+(r.piezaDestino?' ('+r.piezaDestino+')':'') : r.piezaPat;
+  return `<div style="border:1px solid var(--gris2);border-left:4px solid ${color};border-radius:10px;padding:10px 12px;margin-bottom:10px">
+    <div style="font-weight:600;color:${color};margin-bottom:4px">${titulo}</div>
+    ${fila('Fecha', fFmt(fechaDe(r)))}
+    ${fila('Quirófano / hora', (r.qx||'')+(r.hora?' · '+r.hora:'')+(r.horaReal?' (real '+r.horaReal+(r.horaFin?'–'+r.horaFin:'')+')':''))}
+    ${fila('Procedimiento', r.tipo)}
+    ${fila('Especialidad', r.especialidad)}
+    ${fila('Cirujano', r.cirujano)}
+    ${fila('Tipo de cirugía', r.tipoQx)}
+    ${fila('Lateralidad', r.lateralidad)}
+    ${fila('Estatus', normEstado(r.estado))}
+    ${fila('Evento adverso', ea)}
+    ${fila('Pieza patológica', pieza)}
+  </div>`;
+}
+
+function verReintervencion(id, desdeLista=true){
+  const r=DB.find(x=>String(x.id)===String(id)); if(!r) return;
+  const prev=cirugiasPrevias(r,30), ant=prev[0];
+  const historial=DB.filter(o=>o.expediente&&o.expediente===r.expediente).sort((a,b)=>msFecha(a)-msFecha(b)||pH(a.hora)-pH(b.hora));
+  const dias = ant ? Math.round((msFecha(r)-msFecha(ant))/86400000) : null;
+  const mismoCir = ant && ant.cirujano && ant.cirujano===r.cirujano;
+  const nombreDistinto = ant && (ant.paciente||'').trim().toLowerCase()!==(r.paciente||'').trim().toLowerCase();
+  document.getElementById('modalContent').innerHTML=
+    `<div class="modal-title">🟣 ${r.paciente||'Sin nombre'}<button class="modal-close" onclick="closeModal()">×</button></div>`+
+    `<div style="font-size:12px;color:var(--gris5);margin-bottom:10px">Expediente <b style="font-family:'DM Mono',monospace">${r.expediente}</b> · `+
+      (ant ? `Reintervenido <b>${dias===0?'el mismo día':dias+' día'+(dias!==1?'s':'')}</b> después de la cirugía anterior${mismoCir?' · mismo cirujano':''}. Compara ambos procedimientos para revisar el motivo de la reintervención.` : 'Sin cirugía previa en los 30 días anteriores.')+`</div>`+
+    (nombreDistinto?`<div style="background:#FEF3C7;border:1px solid #F59E0B;border-radius:8px;padding:8px 10px;font-size:12px;color:#78350F;margin-bottom:10px">⚠ El nombre del paciente no coincide entre ambos registros ("${ant.paciente||'—'}"). Verifica que el expediente esté bien capturado.</div>`:'')+
+    (ant ? bloqueCx(ant,'Cirugía anterior','var(--gris5)') : '')+
+    bloqueCx(r,'Reintervención actual','var(--morado)')+
+    (historial.length>2 ? `<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--gris4);margin:12px 0 6px">Historial quirúrgico del expediente (${historial.length})</div>`+
+      historial.map(o=>`<div style="font-size:12px;padding:4px 0;border-bottom:1px solid var(--gris1);${String(o.id)===String(r.id)?'font-weight:600;color:var(--morado)':''}">${fFmt(fechaDe(o))} · ${o.tipo||'—'} · ${o.cirujano||'—'} · ${normEstado(o.estado)}</div>`).join('') : '')+
+    `<div class="form-actions">
+      ${desdeLista&&REIN_LISTA.length?`<button class="btn btn-ghost" onclick="abrirListaRein()">← Volver al listado</button>`:''}
+      <button class="btn btn-ghost" onclick="editarDesdeBD(${r.id})">✏ Editar</button>
+      <button class="btn btn-ghost" onclick="closeModal()">Cerrar</button>
+    </div>`;
+  document.getElementById('modalBg').style.display='flex';
+}
+
+function abrirListaRein(){
+  const recs=REIN_LISTA.map(id=>DB.find(x=>String(x.id)===String(id))).filter(Boolean);
+  document.getElementById('modalContent').innerHTML=
+    `<div class="modal-title">🟣 Reintervenciones a 30 días — cirugías del mes<button class="modal-close" onclick="closeModal()">×</button></div>`+
+    `<div style="font-size:12px;color:var(--gris5);margin-bottom:10px">${recs.length} cirugía${recs.length!==1?'s':''} realizada${recs.length!==1?'s':''} en el mes con otra cirugía realizada al mismo expediente en los 30 días previos. Haz clic en un paciente para comparar la cirugía anterior con la actual.</div>`+
+    `<div class="table-wrap"><table><thead><tr><th>Paciente</th><th>Expediente</th><th>Fecha reintervención</th><th>Procedimiento actual</th><th>Días desde la anterior</th><th></th></tr></thead><tbody>`+
+    recs.map(r=>{ const a=cirugiasPrevias(r,30)[0]; const d=a?Math.round((msFecha(r)-msFecha(a))/86400000):'—';
+      return `<tr style="cursor:pointer" onclick="verReintervencion(${r.id})">
+        <td style="font-weight:500">${r.paciente||'—'}</td>
+        <td style="font-family:'DM Mono',monospace;font-size:11px">${r.expediente}</td>
+        <td style="font-family:'DM Mono',monospace;font-size:11px">${fechaDe(r)}</td>
+        <td style="max-width:160px">${r.tipo||'—'}</td>
+        <td style="color:${typeof d==='number'&&d<=7?'var(--rojo2)':'var(--az2)'};font-weight:600">${d}</td>
+        <td>🔍</td></tr>`; }).join('')+
+    `</tbody></table></div>`+
+    `<div class="form-actions"><button class="btn btn-ghost" onclick="closeModal()">Cerrar</button></div>`;
+  document.getElementById('modalBg').style.display='flex';
+}
+function abrirReinDesdeConcentrado(id){ verReintervencion(id); }
+
 function escAttr(v){ return String(v==null?'':v).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;'); }
 const SH = 32;
 
@@ -899,7 +977,7 @@ function openDetail(id){
   document.getElementById('modalContent').innerHTML=
     `<div class="modal-title">${sg.paciente||'Sin nombre'}<button class="modal-close" onclick="closeModal()">×</button></div>`+
     (isc&&others.length?`<div class="conflict-warn">⚠ Traslape con: ${others.map(o=>nomPac(o)+' ('+o.hora+')').join(', ')}</div>`:'')+
-    (isRein?`<div style="background:var(--morado3);border:1px solid #D8B4FE;border-radius:8px;padding:10px 12px;margin-bottom:12px;font-size:12px;color:var(--morado)">🔄 Reintervención detectada — expediente ${sg.expediente} tiene otra cirugía realizada en los 30 días previos (${reinDB.length} realizadas en total)</div>`:'')+
+    (isRein?`<div onclick="verReintervencion(${sg.id},false)" style="cursor:pointer;background:var(--morado3);border:1px solid #D8B4FE;border-radius:8px;padding:10px 12px;margin-bottom:12px;font-size:12px;color:var(--morado)">🔄 Reintervención detectada — expediente ${sg.expediente} tiene otra cirugía realizada en los 30 días previos (${reinDB.length} realizadas en total) · <b>Ver comparativo 🔍</b></div>`:'')+
     `<div style="margin-bottom:8px">${badgeEst(sg.estado)}</div>`+
     `<div class="sbtns">${ESTADOS.map(e=>`<button class="sbtn ${e.toLowerCase().replace(' ','-')}${sg.estado===e?' active-s':''}" onclick="requirePin(()=>chSt(${id},'${e}'))">${e}</button>`).join('')}</div>`+
     `<div style="background:${sg.cirugiaSegura==='Completa'?'var(--verde3)':sg.cirugiaSegura?'#FEF9C3':'var(--rojo3)'};border:1.5px solid ${sg.cirugiaSegura==='Completa'?'var(--verde2)':sg.cirugiaSegura?'#F59E0B':'var(--rojo2)'};border-radius:10px;padding:10px 12px;margin:0 0 12px">
@@ -1426,7 +1504,7 @@ function renderTabla(){
       <td style="font-family:'DM Mono',monospace;font-size:11px">${r.horaFin||'—'}</td>
       <td style="text-align:center">${durRealCell}</td>
       <td>${badgeEst(r.estado)}${porCerrar(r)?`<div title="${escAttr(vencida(r)?'Ya debió terminar':'Falta: '+faltaCierre(r).join(', '))}" style="font-size:10px;color:#B45309;margin-top:2px">📝 por cerrar</div>`:''}</td>
-      <td>${rein?'<span class="badge b-si">Sí</span>':'<span class="badge b-no">No</span>'}</td>
+      <td>${rein?`<span class="badge b-si" style="cursor:pointer" title="Ver cirugía anterior y actual" onclick="verReintervencion(${r.id},false)">Sí 🔍</span>`:'<span class="badge b-no">No</span>'}</td>
       <td>${r.cirugiaSegura
         ? `<span class="badge ${r.cirugiaSegura==='Completa'?'b-completada':r.cirugiaSegura==='Incompleta'?'b-traslape':'b-cancelada'}">${r.cirugiaSegura}</span>`
         : '—'}</td>
@@ -1594,6 +1672,7 @@ function renderConcentrado(){
       (f-fechaMs(o))<=DIAS_REIN*86400000);
   });
   const pctRein = pct(reinRecs.length, nR) ?? 0;
+  REIN_LISTA = [...reinRecs].sort((a,b)=>msFecha(a)-msFecha(b)).map(r=>r.id);
 
   // ── 6. MORTALIDAD ────────────────────────────────────────────────────────
   const fallecimientos = realizadas.filter(r=>est(r)==='Fallecimiento');
@@ -1740,7 +1819,8 @@ function renderConcentrado(){
       pctRein+'%',
       `${reinRecs.length} de ${nR} cirugías realizadas · las canceladas o reprogramadas ya no cuentan como reintervención`,
       pctRein*5,
-      lista(reinRecs, filaCx)
+      (reinRecs.length ? `<div style="margin-top:8px"><button class="btn btn-ghost btn-sm" onclick="abrirListaRein()">🔍 Ver listado comparativo</button></div>` : '')
+        + lista(reinRecs, r=>`<div>· <a href="#" onclick="verReintervencion(${r.id});return false" style="color:var(--az2)">${fechaDe(r).slice(5)} ${r.qx||''} ${r.hora||''}</a> — ${nomPac(r)} · ${r.cirujano||'sin cirujano'}</div>`)
     )+
     indCard('var(--naranja)', '⚠️', 'Eventos Adversos',
       '(eventos adversos / cirugías realizadas) × 100',
