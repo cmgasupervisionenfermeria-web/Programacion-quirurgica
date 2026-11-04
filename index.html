@@ -182,6 +182,33 @@ tbody tr:last-child{border-bottom:none}
 .ind-grid{grid-template-columns:1fr}
 .timeline{grid-template-columns:44px 1fr 1fr 1fr}
 }
+/* Calendario */
+.cal-panel{background:#fff;border:1px solid var(--gris2);border-radius:var(--r);box-shadow:var(--shadow);padding:12px;margin-bottom:14px;display:none}
+.cal-panel.vis{display:block}
+.cal-hdr{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px}
+.cal-hdr b{font-size:14px;text-transform:capitalize}
+.cal-hdr button{background:#fff;border:1px solid var(--gris3);border-radius:7px;padding:5px 10px;cursor:pointer;font-family:inherit;font-size:13px}
+.cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:4px}
+.cal-dow{font-size:10px;font-weight:700;color:var(--gris4);text-align:center;text-transform:uppercase;padding:2px 0}
+.cal-day{position:relative;min-height:52px;border:1px solid var(--gris2);border-radius:8px;padding:4px 5px;cursor:pointer;background:#fff;font-size:12px;display:flex;flex-direction:column;gap:2px;transition:background .1s}
+.cal-day:hover{border-color:var(--az2)}
+.cal-day.otro{opacity:.35}
+.cal-day.hoy{box-shadow:inset 0 0 0 2px var(--az2)}
+.cal-day.sel{background:var(--az)!important;color:#fff;border-color:var(--az)}
+.cal-day .n{font-weight:600}
+.cal-day .c{font-size:10px;border-radius:99px;padding:1px 6px;align-self:flex-start;background:#fff;color:var(--az);border:1px solid var(--az3)}
+.cal-day.sel .c{background:rgba(255,255,255,.25);color:#fff;border-color:transparent}
+.cal-day .x{font-size:9px;color:var(--rojo2)}
+.cal-day.sel .x{color:#FECACA}
+.cal-day .pc{position:absolute;top:4px;right:5px;font-size:9px}
+/* Buscador */
+.bus-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px;padding:12px 18px;background:var(--gris0);border-bottom:1px solid var(--gris2)}
+.bus-grid label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--gris4);display:block;margin-bottom:3px}
+.bus-grid input,.bus-grid select{width:100%;padding:7px 9px;font-size:12px}
+.chip{display:inline-block;border:1px solid var(--gris3);background:#fff;border-radius:99px;padding:4px 10px;font-size:11px;cursor:pointer;margin:0 4px 4px 0;font-family:inherit}
+.chip.on{background:var(--az);color:#fff;border-color:var(--az)}
+tr.clic{cursor:pointer} tr.clic:hover td{background:var(--az3)}
+@media(max-width:700px){.cal-day{min-height:44px;padding:3px}.cal-day .c{padding:0 4px}.bus-grid>div[style*="span 2"]{grid-column:auto!important}}
 </style>
 </head>
 <body>
@@ -191,6 +218,7 @@ tbody tr:last-child{border-bottom:none}
 <span class="nav-tab-wrap"><button class="nav-tab active" onclick="showPage('dia',this)">📅 Por Día</button><span id="badge-insumos" class="insumos-badge" style="display:none">0</span></span>
 <button class="nav-tab" onclick="showPage('base',this)">☰ Base de Datos</button>
 <button class="nav-tab" onclick="showPage('concentrado',this)">📊 Concentrado</button>
+<button class="nav-tab" onclick="showPage('buscar',this)">🔍 Buscador</button>
 </div>
 <div style="margin-left:auto;display:flex;align-items:center;gap:8px;padding-left:12px">
 <span id="modeLabel" style="background:var(--amarillo3);color:var(--amarillo);padding:4px 10px;border-radius:99px;font-size:11px;font-weight:500">Solo lectura</span>
@@ -217,11 +245,14 @@ style="width:100%;padding:12px;font-size:20px;text-align:center;border:2px solid
 <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:14px">
 <div class="date-nav" style="margin:0">
 <button id="prevDay">‹</button>
-<span class="date-lbl" id="dateLabel"></span>
+<span class="date-lbl" id="dateLabel" onclick="toggleCal()" style="cursor:pointer" title="Abrir calendario"></span>
 <button id="nextDay">›</button>
+<button onclick="toggleCal()" title="Calendario del mes">📅</button>
+<button onclick="irHoy()" style="font-size:12px">Hoy</button>
 </div>
 <button class="btn btn-primary" id="btnNueva">+ Nueva cirugía</button>
 </div>
+<div class="cal-panel" id="calPanel"></div>
 <div id="alertBanner"></div>
 <div class="stats-row" id="statsRow"></div>
 <div class="view-tabs">
@@ -287,22 +318,7 @@ style="background:var(--gris1);color:var(--gris5);cursor:default">
 <div class="form-grid">
 <div class="form-group full"><label>Procedimiento</label><input type="text" id="f-procedimiento" placeholder="Descripción del procedimiento quirúrgico"></div>
 <div class="form-group"><label>Especialidad</label>
-<select id="f-especialidad">
-<option value="">— Selecciona —</option>
-<option>Cirugía General</option>
-<option>Cirugía Oncológica</option>
-<option>Ortopedia y Traumatología</option>
-<option>Ginecología y Obstetricia</option>
-<option>Urología</option>
-<option>Neurocirugía</option>
-<option>Cirugía Plástica</option>
-<option>Oftalmología</option>
-<option>Otorrinolaringología</option>
-<option>Cardiocirugía</option>
-<option>Cirugía Vascular</option>
-<option>Gastroenterología</option>
-<option>Pediatría Quirúrgica</option>
-</select>
+<select id="f-especialidad" onchange="espOtra(this)"></select>
 </div>
 <div class="form-group"><label>Lateralidad</label>
 <select id="f-lateralidad"><option value="">— Selecciona —</option><option>N/A</option><option>Derecha</option><option>Izquierda</option><option>Bilateral</option></select>
@@ -406,6 +422,36 @@ style="background:var(--gris1);color:var(--gris5);cursor:default">
 </div>
 </div>
 
+<div class="page" id="page-buscar">
+<div class="page-hdr">
+<div><h1>Buscador de cirugías</h1><p>Busca por paciente, médico, especialidad o procedimiento y consulta cuántas cirugías tiene cada médico</p></div>
+<div style="display:flex;gap:8px;flex-wrap:wrap">
+<button class="btn btn-ghost btn-sm" onclick="requirePin(abrirHomologacion)">🩺 Homologar nombres de médicos</button>
+<button class="btn btn-primary btn-sm" onclick="exportarBusqueda()">↓ Exportar resultados</button>
+</div>
+</div>
+<div class="card" style="margin-bottom:14px">
+<div class="bus-grid">
+<div style="grid-column:span 2"><label>Texto libre</label><input id="b-texto" placeholder="🔍 Paciente, expediente, procedimiento, médico…" oninput="renderBuscador()"></div>
+<div><label>Especialidad</label><select id="b-esp" onchange="renderBuscador()"></select></div>
+<div><label>Cirujano</label><select id="b-med" onchange="renderBuscador()"></select></div>
+<div><label>Estatus</label><select id="b-est" onchange="renderBuscador()"><option value="">Todos</option><option>Pendiente</option><option>En curso</option><option>Completada</option><option>Cancelada</option><option>Suspendida</option><option>Fallecimiento</option><option value="__real">Realizadas (Completada + Fallecimiento)</option></select></div>
+<div><label>Desde</label><input type="date" id="b-desde" onchange="marcarRango('');renderBuscador()"></div>
+<div><label>Hasta</label><input type="date" id="b-hasta" onchange="marcarRango('');renderBuscador()"></div>
+</div>
+<div style="padding:10px 18px 6px">
+<button class="chip" data-r="hoy" onclick="rangoBus('hoy')">Hoy</button><button class="chip" data-r="semana" onclick="rangoBus('semana')">Esta semana</button><button class="chip" data-r="mes" onclick="rangoBus('mes')">Este mes</button><button class="chip" data-r="mesant" onclick="rangoBus('mesant')">Mes anterior</button><button class="chip" data-r="anio" onclick="rangoBus('anio')">Este año</button><button class="chip" data-r="todo" onclick="rangoBus('todo')">Todo</button>
+<button class="chip" onclick="limpiarBus()" style="float:right">✕ Limpiar filtros</button>
+</div>
+</div>
+<div class="stats-grid-4" id="bus-stats"></div>
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:12px;margin-bottom:14px">
+<div class="card"><div style="padding:12px 16px;border-bottom:1px solid var(--gris2);font-weight:600;font-size:13px">👨‍⚕️ Cirugías por médico <span style="font-weight:400;color:var(--gris4);font-size:11px">· clic para filtrar</span></div><div class="table-wrap" style="max-height:360px;overflow:auto" id="bus-med"></div></div>
+<div class="card"><div style="padding:12px 16px;border-bottom:1px solid var(--gris2);font-weight:600;font-size:13px">🏥 Cirugías por especialidad <span style="font-weight:400;color:var(--gris4);font-size:11px">· clic para filtrar</span></div><div class="table-wrap" style="max-height:360px;overflow:auto" id="bus-esp"></div></div>
+</div>
+<div class="card"><div style="padding:12px 16px;border-bottom:1px solid var(--gris2);font-weight:600;font-size:13px" id="bus-titulo">Resultados</div><div class="table-wrap" id="bus-res"></div></div>
+</div>
+
 <div class="page" id="page-concentrado">
 <div class="page-hdr">
 <div><h1>Concentrado Mensual</h1><p>Indicadores calculados desde la base de datos</p></div>
@@ -434,7 +480,60 @@ const GAS_URL = 'https://script.google.com/macros/s/AKfycbwyQdQl-QuUcek0m7_8BvGA
 const PIN_CORRECTO = 'QXCMG26';
 const QXS = ['Quirófano 1','Quirófano 2','Quirófano 3'];
 const ESTADOS = ['Pendiente','En curso','Completada','Cancelada','Suspendida','Fallecimiento'];
-const ESPECIALIDADES = ['Cirugía General','Cirugía Oncológica','Ortopedia y Traumatología','Ginecología y Obstetricia','Urología','Neurocirugía','Cirugía Plástica','Oftalmología','Otorrinolaringología','Cardiocirugía','Cirugía Vascular','Gastroenterología','Pediatría Quirúrgica'];
+// Catálogo de especialidades quirúrgicas (se conservan los nombres que ya existían
+// en la base para no alterar los registros guardados).
+const ESPECIALIDADES_BASE = [
+  'Algología / Clínica del Dolor','Biología de la Reproducción','Cardiocirugía',
+  'Cirugía Bariátrica','Cirugía de Cabeza y Cuello','Cirugía de Columna','Cirugía de Mano',
+  'Cirugía de Tórax','Cirugía Endocrina','Cirugía General','Cirugía Maxilofacial',
+  'Cirugía Oncológica','Cirugía Plástica','Cirugía Vascular','Coloproctología',
+  'Dermatología Quirúrgica','Gastroenterología','Ginecología Oncológica','Ginecología y Obstetricia',
+  'Hemodinamia / Cardiología Intervencionista','Neurocirugía','Odontología / Cirugía Bucal',
+  'Oftalmología','Ortopedia y Traumatología','Otorrinolaringología','Pediatría Quirúrgica',
+  'Radiología Intervencionista','Trasplantes','Urología'
+];
+// Especialidades agregadas con "Otra…" en este equipo
+let ESP_EXTRA = (()=>{ try{ return JSON.parse(localStorage.getItem('cmga_esp_extra'))||[]; }catch(e){ return []; } })();
+let ESPECIALIDADES = [...new Set([...ESPECIALIDADES_BASE, ...ESP_EXTRA])].sort((a,b)=>a.localeCompare(b,'es'));
+// Nombres alternos que se reconocen como la misma especialidad
+const ALIAS_ESP = {
+  'cirugia pediatrica':'Pediatría Quirúrgica','pediatria quirurgica':'Pediatría Quirúrgica',
+  'angiologia':'Cirugía Vascular','angiologia y cirugia vascular':'Cirugía Vascular','cirugia vascular y endovascular':'Cirugía Vascular','vascular':'Cirugía Vascular',
+  'ginecologia':'Ginecología y Obstetricia','obstetricia':'Ginecología y Obstetricia','gineco obstetricia':'Ginecología y Obstetricia','ginecoobstetricia':'Ginecología y Obstetricia',
+  'ortopedia':'Ortopedia y Traumatología','traumatologia':'Ortopedia y Traumatología','traumatologia y ortopedia':'Ortopedia y Traumatología',
+  'cirugia plastica y reconstructiva':'Cirugía Plástica','cirugia plastica estetica y reconstructiva':'Cirugía Plástica','plastica':'Cirugía Plástica',
+  'cirugia cardiotoracica':'Cardiocirugía','cirugia cardiovascular':'Cardiocirugía','cardiotoracica':'Cardiocirugía',
+  'cirugia toracica':'Cirugía de Tórax','neumologia quirurgica':'Cirugía de Tórax',
+  'proctologia':'Coloproctología','cirugia de colon y recto':'Coloproctología','cirugia colorrectal':'Coloproctología',
+  'otorrino':'Otorrinolaringología','otorrinolaringologia y cirugia de cabeza y cuello':'Otorrinolaringología',
+  'cirugia maxilofacial':'Cirugía Maxilofacial','maxilofacial':'Cirugía Maxilofacial',
+  'endoscopia':'Gastroenterología','gastroenterologia y endoscopia':'Gastroenterología',
+  'oncologia':'Cirugía Oncológica','cirugia oncologica':'Cirugía Oncológica',
+  'urologia':'Urología','neurocirugia':'Neurocirugía','oftalmologia':'Oftalmología','general':'Cirugía General',
+  'hemodinamia':'Hemodinamia / Cardiología Intervencionista','cardiologia intervencionista':'Hemodinamia / Cardiología Intervencionista',
+  'algologia':'Algología / Clínica del Dolor','clinica del dolor':'Algología / Clínica del Dolor',
+  'biologia de la reproduccion':'Biología de la Reproducción','reproduccion humana':'Biología de la Reproducción',
+  'cirugia de columna':'Cirugía de Columna','columna':'Cirugía de Columna','bariatrica':'Cirugía Bariátrica'
+};
+const sinAcentos = t => String(t||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+function optsEspecialidad(sel){
+  const extra = sel && !ESPECIALIDADES.includes(sel) ? [sel] : [];
+  return ['<option value="">— Selecciona —</option>']
+    .concat([...ESPECIALIDADES, ...extra].map(e=>`<option value="${escAttr(e)}"${sel===e?' selected':''}>${e}</option>`))
+    .concat(['<option value="__otra">➕ Otra especialidad…</option>']).join('');
+}
+// Al elegir "Otra…" se pide el nombre y queda guardada en el catálogo de este equipo
+function espOtra(selEl){
+  if(selEl.value!=='__otra') return;
+  const n=(prompt('Nombre de la especialidad:')||'').trim().replace(/\s+/g,' ');
+  if(!n){ selEl.value=''; return; }
+  const v=normEsp(n);
+  if(!ESPECIALIDADES.includes(v)){
+    ESP_EXTRA.push(v); try{ localStorage.setItem('cmga_esp_extra', JSON.stringify(ESP_EXTRA)); }catch(e){}
+    ESPECIALIDADES=[...new Set([...ESPECIALIDADES, v])].sort((a,b)=>a.localeCompare(b,'es'));
+  }
+  selEl.innerHTML=optsEspecialidad(v);
+}
 const TIPOS_QX = ['Programada','Programada espontánea','Urgente'];
 // ── CAPACIDAD QUIRÚRGICA POR TURNO ─────────────────────────────────────────
 // Salas que se pueden atender con el personal de cada turno.
@@ -466,8 +565,12 @@ function normEstado(v){
 function normEsp(v){
   const t=(v==null?'':String(v)).trim().replace(/\s+/g,' ');
   if(!t) return '';
-  const hit=ESPECIALIDADES.find(e=>e.localeCompare(t,'es',{sensitivity:'base'})===0);
-  return hit||t;
+  const k=sinAcentos(t).toLowerCase().replace(/^dr[a]?\.?\s+/,'');
+  const hit=ESPECIALIDADES.find(e=>sinAcentos(e).toLowerCase()===k);
+  if(hit) return hit;
+  if(ALIAS_ESP[k]) return ALIAS_ESP[k];
+  // Desconocida: se conserva con formato de título
+  return t.charAt(0).toUpperCase()+t.slice(1);
 }
 function esCancelOSusp(r){ const e=normEstado(r.estado); return e==='Cancelada'||e==='Suspendida'; }
 // Duración entre dos horas; admite cirugías que cruzan la medianoche (hasta 12 h)
@@ -632,9 +735,17 @@ async function apiCall(payload){
   try{
     const params = new URLSearchParams();
     params.append('action', payload.action);
-    if(payload.record) params.append('record', JSON.stringify(payload.record));
+    if(payload.record){
+      const rec={...payload.record}; delete rec._cirOrig; delete rec._aneOrig;
+      params.append('record', JSON.stringify(rec));
+    }
     if(payload.id !== undefined) params.append('id', payload.id);
-    return await jsonpRequest(GAS_URL + '?' + params.toString());
+    const res = await jsonpRequest(GAS_URL + '?' + params.toString());
+    if(res && res.ok && payload.record){
+      const o=DB.find(x=>String(x.id)===String(payload.record.id));
+      if(o){ o._cirOrig=String(payload.record.cirujano||''); o._aneOrig=String(payload.record.anestesiologo||''); }
+    }
+    return res;
   } catch(e){ console.error(e); return {ok:false}; }
 }
 
@@ -645,6 +756,8 @@ async function cargarDatos(){
     DB = Array.isArray(data) ? data : [];
     nid = DB.length ? Math.max(...DB.map(x=>Number(x.id)||0))+1 : 1;
     diaDB={};
+    DB.forEach(r=>{ RAW_DB[String(r.id)]={...r}; r._cirOrig=String(r.cirujano||'').trim(); r._aneOrig=String(r.anestesiologo||'').trim(); });
+    construirMapaMedicos();
     DB.forEach(r=>{
       if(r.fecha) r.fecha = r.fecha.toString().split('T')[0];
       if(r._fecha) r._fecha = r._fecha.toString().split('T')[0];
@@ -672,7 +785,8 @@ async function cargarDatos(){
       r.cirugiaSegura = normCS(r.cirugiaSegura);
       r.estado = normEstado(r.estado);
       r.especialidad = normEsp(r.especialidad);
-      if(r.cirujano) r.cirujano = corregirNombre(r.cirujano);
+      if(r.cirujano) r.cirujano = canonMed(r.cirujano);
+      if(r.anestesiologo) r.anestesiologo = canonMed(r.anestesiologo);
       if(r.duracion!==''&&r.duracion!=null) r.duracion = Number(r.duracion)||60;
       const f=r.fecha||r._fecha;
       if(f){if(!diaDB[f])diaDB[f]=[];diaDB[f].push(r);}
@@ -684,6 +798,7 @@ async function cargarDatos(){
   actualizarBadgeInsumos();
   if(document.getElementById('page-base').classList.contains('active')) renderTabla();
   if(document.getElementById('page-concentrado').classList.contains('active')) renderConcentrado();
+  if(document.getElementById('page-buscar').classList.contains('active')) initBuscador();
 }
 
 function saveDia(){}
@@ -772,6 +887,7 @@ function showPage(id, btn){
   if(id==='base') renderTabla();
   if(id==='concentrado') renderConcentrado();
   if(id==='dia') render();
+  if(id==='buscar') initBuscador();
 }
 
 function pH(h){ if(!h)return 0; const p=h.split(':').map(Number); return p[0]*60+(p[1]||0); }
@@ -954,7 +1070,8 @@ function rCards(s,cf){
 }
 
 function render(){
-  document.getElementById('dateLabel').textContent=fmt(cur);
+  document.getElementById('dateLabel').textContent='📅 '+fmt(cur);
+  if(document.getElementById('calPanel')?.classList.contains('vis')) renderCal();
   const s=gS(), cf=dC(s);
   rBanner(s,cf); rStats(s,cf); rTL(s,cf); rCards(s,cf);
 }
@@ -1158,7 +1275,7 @@ function openForm(sg, modoCierre=false){
       <div class="form-group"><label>Hora real inicio</label><input type="time" id="ehr" value="${sg.horaReal||''}" onchange="calcDuracionRealModal()" style="font-family:'DM Mono',monospace"></div>
       <div class="form-group"><label>Hora real fin</label><input type="time" id="ehf" value="${sg.horaFin||''}" onchange="calcDuracionRealModal()" style="font-family:'DM Mono',monospace"></div>
       <div class="form-group"><label>Duración real (min)</label><input id="edurreal" type="number" value="${durR}" readonly style="background:var(--gris1);color:var(--verde);font-weight:600;cursor:default" placeholder="Calculada automáticamente"></div>
-      <div class="form-group"><label>Especialidad</label><select id="eesp">${['',...ESPECIALIDADES, ...(sg.especialidad&&!ESPECIALIDADES.includes(sg.especialidad)?[sg.especialidad]:[])].map(e=>`<option value="${escAttr(e)}"${(sg.especialidad||'')===e?' selected':''}>${e||'— Selecciona —'}</option>`).join('')}</select></div>
+      <div class="form-group"><label>Especialidad</label><select id="eesp" onchange="espOtra(this)">${optsEspecialidad(sg.especialidad||'')}</select></div>
       <div class="form-group"><label>Lateralidad</label><select id="elat">${latOpts}</select></div>
       <div class="form-group"><label>N° Expediente</label><input id="eexp" value="${sg.expediente||''}"></div>
       <div class="form-group full"><label>Paciente</label><input id="ep" value="${sg.paciente||''}"></div>
@@ -1267,11 +1384,11 @@ async function saveFrm(id){
     duracionReal:durReal,
     duracion:parseInt(document.getElementById('ed').value)||60,
     expediente:(document.getElementById('eexp').value||'').trim().toUpperCase(),
-    cirujano:document.getElementById('ec').value.trim(),
-    anestesiologo:document.getElementById('ea').value.trim(),
+    cirujano:canonMed(document.getElementById('ec').value),
+    anestesiologo:canonMed(document.getElementById('ea').value),
     instrumentista:document.getElementById('ei').value.trim(),
     lateralidad:document.getElementById('elat').value,
-    especialidad:document.getElementById('eesp').value.trim(),
+    especialidad:(document.getElementById('eesp').value==='__otra'?'':document.getElementById('eesp').value.trim()),
     insumos:document.getElementById('em').value.trim(),
     proveedor:document.getElementById('eprov').value.trim(),
     personal:document.getElementById('epersonal').value.trim(),
@@ -1423,10 +1540,10 @@ function guardarCirugia(){
     paciente:document.getElementById('f-paciente').value.trim(),
     tipo:document.getElementById('f-procedimiento').value.trim(),
     tipoQx:document.getElementById('f-tipo').value,
-    especialidad:document.getElementById('f-especialidad').value.trim(),
+    especialidad:(document.getElementById('f-especialidad').value==='__otra'?'':document.getElementById('f-especialidad').value.trim()),
     lateralidad:document.getElementById('f-lateralidad').value,
-    cirujano:document.getElementById('f-cirujano').value.trim(),
-    anestesiologo:document.getElementById('f-anestesiologo').value.trim(),
+    cirujano:canonMed(document.getElementById('f-cirujano').value),
+    anestesiologo:canonMed(document.getElementById('f-anestesiologo').value),
     instrumentista:document.getElementById('f-instrumentista').value.trim(),
     estado:document.getElementById('f-estatus').value,
     insumos:document.getElementById('f-insumos').value.trim(),
@@ -1913,10 +2030,279 @@ function renderConcentrado(){
 }
 
 document.getElementById('prevDay').onclick=()=>{cur.setDate(cur.getDate()-1);render()};
+document.addEventListener('keydown',e=>{ if(e.key==='Escape') toggleCal(false); });
 document.getElementById('nextDay').onclick=()=>{cur.setDate(cur.getDate()+1);render()};
 document.getElementById('btnNueva').onclick=()=>{
-  requirePin(()=>{ showPage('registro',null); document.querySelector('[onclick="showPage(\'registro\',this)"]')?.classList.add('active'); });
+  requirePin(()=>{
+    showPage('registro',null); document.querySelector('[onclick="showPage(\'registro\',this)"]')?.classList.add('active');
+    // Programar en el día que se está viendo / se eligió en el calendario
+    document.getElementById('f-fecha').value=dk(cur);
+    if(typeof chkCfRegistro==='function') chkCfRegistro();
+  });
 };
+
+// ════════ CALENDARIO MENSUAL ════════
+let calMes = new Date(cur.getFullYear(), cur.getMonth(), 1);
+function toggleCal(forzar){
+  const p=document.getElementById('calPanel'); if(!p) return;
+  const abrir = forzar!==undefined ? forzar : !p.classList.contains('vis');
+  if(abrir){ calMes=new Date(cur.getFullYear(), cur.getMonth(), 1); renderCal(); }
+  p.classList.toggle('vis', abrir);
+}
+function calNav(d){ calMes=new Date(calMes.getFullYear(), calMes.getMonth()+d, 1); renderCal(); }
+function irHoy(){ cur=new Date(); cur.setHours(0,0,0,0); calMes=new Date(cur.getFullYear(),cur.getMonth(),1); render(); }
+function seleccionarDia(k){ cur=new Date(k+'T00:00:00'); toggleCal(false); render(); }
+function renderCal(){
+  const p=document.getElementById('calPanel'); if(!p) return;
+  const y=calMes.getFullYear(), m=calMes.getMonth();
+  const ini=new Date(y,m,1), offset=(ini.getDay()+6)%7; // semana inicia en lunes
+  const hoyK=dk(new Date()), selK=dk(cur);
+  let totMes=0, cancMes=0;
+  let html=`<div class="cal-hdr"><button onclick="calNav(-1)">‹</button><b>${calMes.toLocaleDateString('es-MX',{month:'long',year:'numeric'})}</b><button onclick="calNav(1)">›</button></div>`;
+  html+='<div class="cal-grid">'+['Lun','Mar','Mié','Jue','Vie','Sáb','Dom'].map(d=>`<div class="cal-dow">${d}</div>`).join('');
+  for(let i=0;i<42;i++){
+    const d=new Date(y,m,1-offset+i);
+    if(i>=35 && d.getMonth()!==m) break;
+    const k=dk(d), arr=diaDB[k]||[];
+    const act=arr.filter(r=>!esCancelOSusp(r)), canc=arr.length-act.length, pc=arr.filter(porCerrar).length;
+    if(d.getMonth()===m){ totMes+=act.length; cancMes+=canc; }
+    const porSala=QXS.map(q=>q.replace('Quirófano ','Q')+': '+act.filter(r=>r.qx===q).length).join(' · ');
+    const intens = act.length ? Math.min(0.08+act.length*0.06,0.45) : 0;
+    html+=`<div class="cal-day${d.getMonth()!==m?' otro':''}${k===hoyK?' hoy':''}${k===selK?' sel':''}" style="${intens?`background:rgba(37,99,168,${intens})`:''}" onclick="seleccionarDia('${k}')" title="${act.length} cirugía${act.length!==1?'s':''}${canc?' · '+canc+' cancelada/suspendida':''}${act.length?' · '+porSala:''}${pc?' · '+pc+' por cerrar':''}">
+      <span class="n">${d.getDate()}</span>
+      ${act.length?`<span class="c">${act.length} cx</span>`:''}
+      ${canc?`<span class="x">${canc} canc.</span>`:''}
+      ${pc?'<span class="pc">📝</span>':''}
+    </div>`;
+  }
+  html+='</div>';
+  html+=`<div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:6px;margin-top:8px;font-size:11px;color:var(--gris5)">
+    <span><b>${totMes}</b> cirugías en el mes${cancMes?' · '+cancMes+' canceladas/suspendidas':''}</span>
+    <span>📝 pendientes de cierre · azul más intenso = más cirugías · toca un día para abrirlo</span></div>`;
+  p.innerHTML=html;
+}
+
+// ════════ BUSCADOR ════════
+const normTxt = t => sinAcentos(String(t||'')).toLowerCase();
+let busIniciado=false;
+function initBuscador(){
+  const medicos=[...new Set(DB.map(r=>r.cirujano).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'es'));
+  const esps=[...new Set([...ESPECIALIDADES, ...DB.map(r=>r.especialidad).filter(Boolean)])].sort((a,b)=>a.localeCompare(b,'es'));
+  const sm=document.getElementById('b-med'), se=document.getElementById('b-esp');
+  const vm=sm.value, ve=se.value;
+  sm.innerHTML='<option value="">Todos</option>'+medicos.map(m=>`<option value="${escAttr(m)}">${m}</option>`).join('');
+  se.innerHTML='<option value="">Todas</option><option value="__sin">⚠ Sin especialidad</option>'+esps.map(e=>`<option value="${escAttr(e)}">${e}</option>`).join('');
+  sm.value=vm; se.value=ve;
+  if(!busIniciado){ busIniciado=true; rangoBus('mes'); return; }
+  renderBuscador();
+}
+function marcarRango(r){ document.querySelectorAll('#page-buscar .chip[data-r]').forEach(c=>c.classList.toggle('on',c.dataset.r===r)); }
+function rangoBus(r){
+  const h=new Date(); h.setHours(0,0,0,0); let d='', a='';
+  if(r==='hoy'){ d=a=dk(h); }
+  if(r==='semana'){ const l=new Date(h); l.setDate(h.getDate()-((h.getDay()+6)%7)); const dm=new Date(l); dm.setDate(l.getDate()+6); d=dk(l); a=dk(dm); }
+  if(r==='mes'){ d=dk(new Date(h.getFullYear(),h.getMonth(),1)); a=dk(new Date(h.getFullYear(),h.getMonth()+1,0)); }
+  if(r==='mesant'){ d=dk(new Date(h.getFullYear(),h.getMonth()-1,1)); a=dk(new Date(h.getFullYear(),h.getMonth(),0)); }
+  if(r==='anio'){ d=h.getFullYear()+'-01-01'; a=h.getFullYear()+'-12-31'; }
+  document.getElementById('b-desde').value=d; document.getElementById('b-hasta').value=a;
+  marcarRango(r); renderBuscador();
+}
+function limpiarBus(){ ['b-texto','b-esp','b-med','b-est'].forEach(id=>document.getElementById(id).value=''); rangoBus('todo'); }
+function filtrarBus(sinMed=false, sinEsp=false){
+  const t=normTxt(document.getElementById('b-texto').value).trim();
+  const esp=document.getElementById('b-esp').value, med=document.getElementById('b-med').value;
+  const est=document.getElementById('b-est').value;
+  const de=document.getElementById('b-desde').value, ha=document.getElementById('b-hasta').value;
+  const palabras=t.split(/\s+/).filter(Boolean);
+  return DB.filter(r=>{
+    const f=fechaDe(r);
+    if(de&&(!f||f<de)) return false;
+    if(ha&&(!f||f>ha)) return false;
+    if(!sinEsp && esp){ if(esp==='__sin'){ if(r.especialidad) return false; } else if(r.especialidad!==esp) return false; }
+    if(!sinMed && med && r.cirujano!==med) return false;
+    if(est){ const e=normEstado(r.estado); if(est==='__real'?!esRealizada(r):e!==est) return false; }
+    if(palabras.length){
+      const txt=normTxt([r.paciente,r.expediente,r.tipo,r.cirujano,r.anestesiologo,r.especialidad,r.instrumentista,r.qx].join(' '));
+      if(!palabras.every(p=>txt.includes(p))) return false;
+    }
+    return true;
+  }).sort((a,b)=>fechaDe(b).localeCompare(fechaDe(a))||(a.hora||'').localeCompare(b.hora||''));
+}
+function resumenPor(recs, campo){
+  const g={};
+  recs.forEach(r=>{
+    const k=r[campo]||(campo==='especialidad'?'⚠ Sin especialidad':'⚠ Sin cirujano');
+    const x=g[k]=g[k]||{n:0,real:0,pend:0,canc:0,sub:{}};
+    x.n++;
+    if(esRealizada(r)) x.real++; else if(esCancelOSusp(r)) x.canc++; else x.pend++;
+    const sk=campo==='cirujano'?(r.especialidad||'Sin especialidad'):(r.cirujano||'Sin cirujano');
+    x.sub[sk]=(x.sub[sk]||0)+1;
+  });
+  return Object.entries(g).sort((a,b)=>b[1].n-a[1].n||a[0].localeCompare(b[0],'es'));
+}
+let BUS_FILAS={cirujano:[],especialidad:[]};
+function tablaResumen(filas, campo, total){
+  BUS_FILAS[campo]=filas.map(([k])=>k.startsWith('⚠')?(campo==='especialidad'?'__sin':''):k);
+  if(!filas.length) return '<div class="empty" style="padding:20px"><p>Sin resultados</p></div>';
+  const sel=document.getElementById(campo==='cirujano'?'b-med':'b-esp').value;
+  return `<table><thead><tr><th>${campo==='cirujano'?'Médico':'Especialidad'}</th><th style="text-align:center">Total</th><th style="text-align:center">Realiz.</th><th style="text-align:center">Pend.</th><th style="text-align:center">Canc./Susp.</th><th>${campo==='cirujano'?'Especialidades':'Médicos'}</th></tr></thead><tbody>`+
+    filas.map(([k,x],i)=>{
+      const sinDato=k.startsWith('⚠');
+      const val=BUS_FILAS[campo][i];
+      const sub=Object.entries(x.sub).sort((a,b)=>b[1]-a[1]).map(([s,n])=>s+(Object.keys(x.sub).length>1?' ('+n+')':'')).join(', ');
+      return `<tr class="clic" ${sinDato&&campo==='cirujano'?'':`onclick="filtroRapido('${campo}',${i})"`} style="${sel&&sel===val?'background:var(--az3)':''}">
+        <td style="font-weight:500;${sinDato?'color:var(--rojo2)':''}">${sel&&sel===val?'▶ ':''}${k}</td>
+        <td style="text-align:center;font-weight:700;color:var(--az)">${x.n}<div style="font-size:10px;color:var(--gris4);font-weight:400">${Math.round(x.n/total*100)}%</div></td>
+        <td style="text-align:center;color:var(--verde)">${x.real}</td>
+        <td style="text-align:center;color:var(--amarillo)">${x.pend}</td>
+        <td style="text-align:center;color:var(--rojo2)">${x.canc}</td>
+        <td style="font-size:11px;color:var(--gris5);max-width:220px">${sub}</td></tr>`;
+    }).join('')+'</tbody></table>';
+}
+function filtroRapido(campo, i){
+  const val=BUS_FILAS[campo][i];
+  const el=document.getElementById(campo==='cirujano'?'b-med':'b-esp');
+  el.value = el.value===val ? '' : val;  // segundo clic quita el filtro
+  renderBuscador();
+}
+function renderBuscador(){
+  if(!document.getElementById('bus-res')) return;
+  const recs=filtrarBus();
+  const n=recs.length, real=recs.filter(esRealizada).length, canc=recs.filter(esCancelOSusp).length, pend=n-real-canc;
+  const nMed=new Set(recs.map(r=>r.cirujano).filter(Boolean)).size;
+  document.getElementById('bus-stats').innerHTML=
+    `<div class="stat-card"><div class="stat-card-lbl">Cirugías encontradas</div><div class="stat-card-val c-az">${n}</div><div class="stat-card-sub">${nMed} médico${nMed!==1?'s':''}</div></div>`+
+    `<div class="stat-card"><div class="stat-card-lbl">Realizadas</div><div class="stat-card-val c-verde">${real}</div><div class="stat-card-sub">${n?Math.round(real/n*100):0}%</div></div>`+
+    `<div class="stat-card"><div class="stat-card-lbl">Pendientes / en curso</div><div class="stat-card-val c-amarillo">${pend}</div><div class="stat-card-sub">${n?Math.round(pend/n*100):0}%</div></div>`+
+    `<div class="stat-card"><div class="stat-card-lbl">Canceladas / suspendidas</div><div class="stat-card-val c-rojo">${canc}</div><div class="stat-card-sub">${n?Math.round(canc/n*100):0}%</div></div>`;
+  // Cada resumen ignora su propio filtro para que se vea el comparativo completo
+  const rm=filtrarBus(true,false), re=filtrarBus(false,true);
+  document.getElementById('bus-med').innerHTML=tablaResumen(resumenPor(rm,'cirujano'),'cirujano',rm.length||1);
+  document.getElementById('bus-esp').innerHTML=tablaResumen(resumenPor(re,'especialidad'),'especialidad',re.length||1);
+  const MAX=300;
+  document.getElementById('bus-titulo').innerHTML=`Resultados <span style="font-weight:400;color:var(--gris4);font-size:11px">· ${n} cirugía${n!==1?'s':''}${n>MAX?' (se muestran las '+MAX+' más recientes; exporta para ver todas)':''} · clic para abrir</span>`;
+  document.getElementById('bus-res').innerHTML = n ? `<table><thead><tr><th>Fecha</th><th>Hora</th><th>Qx</th><th>Paciente</th><th>Exp.</th><th>Procedimiento</th><th>Especialidad</th><th>Cirujano</th><th>Anestesiólogo</th><th>Tipo</th><th>Estatus</th></tr></thead><tbody>`+
+    recs.slice(0,MAX).map(r=>`<tr class="clic" onclick="irACirugia('${r.id}')">
+      <td style="font-family:'DM Mono',monospace;font-size:11px;white-space:nowrap">${fFmt(fechaDe(r))}</td>
+      <td style="font-family:'DM Mono',monospace;font-size:11px">${r.hora||'—'}</td>
+      <td>${(r.qx||'').replace('Quirófano ','Q')}</td>
+      <td style="max-width:170px">${r.paciente||'—'}</td>
+      <td style="font-family:'DM Mono',monospace;font-size:11px">${r.expediente||'—'}</td>
+      <td style="max-width:180px;color:var(--gris5)">${r.tipo||'—'}</td>
+      <td style="max-width:130px">${r.especialidad||'<span style="color:var(--rojo2)">—</span>'}</td>
+      <td>${r.cirujano||'—'}</td>
+      <td style="color:var(--gris5)">${r.anestesiologo||'—'}</td>
+      <td style="font-size:11px">${r.tipoQx||'—'}</td>
+      <td>${badgeEst(normEstado(r.estado))}</td></tr>`).join('')+'</tbody></table>'
+    : '<div class="empty"><div class="empty-icon">🔍</div><p>Sin cirugías con esos filtros</p></div>';
+}
+function irACirugia(id){
+  const r=DB.find(x=>String(x.id)===String(id)); if(!r) return;
+  const f=fechaDe(r); if(!f) return;
+  cur=new Date(f+'T00:00:00');
+  if(!diaDB[f]) diaDB[f]=[];
+  if(!diaDB[f].some(x=>String(x.id)===String(id))) diaDB[f].push(r);
+  showPage('dia', document.querySelector('[onclick="showPage(\'dia\',this)"]'));
+  openDetail(r.id);
+}
+function exportarBusqueda(){
+  const recs=filtrarBus(); if(!recs.length){ toast('Sin resultados para exportar','error'); return; }
+  const cols=[['fecha','Fecha'],['hora','Hora'],['qx','Quirófano'],['paciente','Paciente'],['expediente','Expediente'],['tipo','Procedimiento'],['especialidad','Especialidad'],['cirujano','Cirujano'],['anestesiologo','Anestesiólogo'],['tipoQx','Tipo de cirugía'],['estado','Estatus'],['duracionReal','Duración real (min)'],['cirugiaSegura','Cirugía segura'],['eventoAdverso','Evento adverso'],['motivo','Motivo cancelación']];
+  const q=v=>`"${String(v??'').replace(/"/g,'""')}"`;
+  const resumen=resumenPor(recs,'cirujano').map(([k,x])=>[k,x.n,x.real,x.pend,x.canc].map(q).join(','));
+  const csv=[cols.map(c=>q(c[1])).join(','), ...recs.map(r=>cols.map(c=>q(r[c[0]])).join(',')), '', q('Resumen por médico'), ['Médico','Total','Realizadas','Pendientes','Canceladas/Suspendidas'].map(q).join(','), ...resumen].join('\n');
+  const a=document.createElement('a');
+  a.href='data:text/csv;charset=utf-8,﻿'+encodeURIComponent(csv);
+  a.download=`busqueda_qx_${dk(new Date())}.csv`; a.click(); toast('Resultados exportados');
+}
+
+// ════════ HOMOLOGACIÓN DE NOMBRES DE MÉDICOS ════════
+let HOMO_GRUPOS=[];
+function abrirHomologacion(){
+  // Agrupa los nombres tal como están GUARDADOS en la hoja (cirujano y anestesiólogo)
+  const g={};
+  DB.forEach(r=>[['_cirOrig','cirujano'],['_aneOrig','anestesiologo']].forEach(([orig,campo])=>{
+    const raw=String(r[orig]??r[campo]??'').trim(); if(!raw) return;
+    const p=partesMedico(raw);
+    const x=g[p.key]=g[p.key]||{key:p.key,variantes:{},cir:0,ane:0};
+    x.variantes[raw]=(x.variantes[raw]||0)+1;
+    if(campo==='cirujano') x.cir++; else x.ane++;
+  }));
+  HOMO_GRUPOS=Object.values(g).map(x=>({...x, final:MAPA_MED[x.key]||canonMed(Object.keys(x.variantes)[0])}))
+    .sort((a,b)=>a.final.localeCompare(b.final,'es'));
+  // Posibles duplicados: un nombre contenido en otro ("Dr. Tiscareño" ⊂ "Dr. Juan Tiscareño")
+  HOMO_GRUPOS.forEach(x=>{
+    const t=x.key.split(' ');
+    x.posible=HOMO_GRUPOS.filter(o=>o!==x&&o.key.split(' ').length>t.length&&t.every(w=>o.key.split(' ').includes(w))).map(o=>o.final);
+  });
+  const conCambio=HOMO_GRUPOS.filter(x=>Object.keys(x.variantes).some(v=>v!==x.final)).length;
+  const conPosible=HOMO_GRUPOS.filter(x=>x.posible.length).length;
+  document.getElementById('modalContent').innerHTML=
+    `<div class="modal-title">🩺 Homologar nombres de médicos<button class="modal-close" onclick="closeModal()">×</button></div>`+
+    `<div style="font-size:12px;color:var(--gris5);margin-bottom:10px;line-height:1.5">Se agrupan las distintas formas en que está escrito cada médico (con o sin "Dr.", mayúsculas, acentos). Revisa el <b>nombre homologado</b> y corrígelo si hace falta (por ejemplo "Dra." en vez de "Dr."). <b>Para unir a dos médicos que son la misma persona</b>, escribe exactamente el mismo nombre en ambos renglones.<br><b>${HOMO_GRUPOS.length}</b> médicos · <b>${conCambio}</b> con variantes por corregir${conPosible?` · <b>${conPosible}</b> posibles duplicados`:''}.</div>`+
+    `<label style="font-size:12px;display:flex;gap:6px;align-items:center;margin-bottom:8px;text-transform:none"><input type="checkbox" id="homo-solo" style="width:auto" onchange="filtrarHomo()"> Mostrar solo los que tienen variantes o posibles duplicados</label>`+
+    `<datalist id="homo-dl">${HOMO_GRUPOS.map(x=>`<option value="${escAttr(x.final)}">`).join('')}</datalist>`+
+    `<div style="max-height:52vh;overflow:auto;border:1px solid var(--gris2);border-radius:8px"><table><thead><tr><th>Cómo está guardado (veces)</th><th style="text-align:center">Cirujano / Anest.</th><th>Nombre homologado</th></tr></thead><tbody>`+
+    HOMO_GRUPOS.map((x,i)=>{
+      const vars=Object.entries(x.variantes).sort((a,b)=>b[1]-a[1]);
+      const difiere=vars.some(([v])=>v!==x.final);
+      return `<tr data-homo="${difiere||x.posible.length?1:0}">
+        <td style="font-size:11px;line-height:1.5">${vars.map(([v,n])=>`<div style="${v===x.final?'color:var(--gris4)':''}">${escAttr(v)} <span style="color:var(--gris4)">(${n})</span></div>`).join('')}
+          ${x.posible.length?`<div style="color:#B45309;margin-top:3px">⚠ ¿Es el mismo que ${x.posible.map(escAttr).join(' / ')}?</div>`:''}</td>
+        <td style="text-align:center;font-size:11px">${x.cir} / ${x.ane}</td>
+        <td><input id="homo-${i}" list="homo-dl" value="${escAttr(x.final)}" style="min-width:200px;font-size:12px;padding:6px 8px;${difiere?'border-color:var(--az2);background:var(--az3)':''}"></td></tr>`;
+    }).join('')+`</tbody></table></div>`+
+    `<div class="form-actions"><button class="btn btn-ghost" onclick="closeModal()">Cancelar</button><button class="btn btn-success" onclick="aplicarHomologacion()">✓ Aplicar y guardar en la hoja</button></div>`;
+  document.getElementById('modalBg').style.display='flex';
+}
+function filtrarHomo(){
+  const solo=document.getElementById('homo-solo').checked;
+  document.querySelectorAll('tr[data-homo]').forEach(tr=>tr.style.display = solo&&tr.dataset.homo!=='1' ? 'none' : '');
+}
+async function aplicarHomologacion(){
+  const destino={};
+  for(let i=0;i<HOMO_GRUPOS.length;i++){
+    const v=String(document.getElementById('homo-'+i).value||'').replace(/\s+/g,' ').trim();
+    if(!v){ toast('Hay un nombre vacío en la lista','error'); return; }
+    const p=partesMedico(v);
+    destino[HOMO_GRUPOS[i].key]=(p.pref||'Dr.')+' '+p.base; // formato "Dr./Dra. Nombre"
+  }
+  const actual = (r,o,c) => String(r[o]??r[c]??'').trim();
+  const nuevo = raw => raw ? (destino[partesMedico(raw).key]||canonMed(raw)) : '';
+  const cambios=DB.filter(r=>{
+    const c=actual(r,'_cirOrig','cirujano'), a=actual(r,'_aneOrig','anestesiologo');
+    return nuevo(c)!==c || nuevo(a)!==a;
+  });
+  if(!cambios.length){ toast('No hay nombres por actualizar ✓'); closeModal(); return; }
+  if(!confirm(`Se actualizará el nombre del médico en ${cambios.length} registro${cambios.length!==1?'s':''} de la hoja.\n\nSolo cambian los campos Cirujano y Anestesiólogo; el resto de los datos queda exactamente igual.\n\n¿Continuar?`)) return;
+  closeModal();
+  // Releer la hoja justo antes de escribir, para no regresar cambios que alguien más haya hecho
+  const destinoGuardado = {...destino};
+  await cargarDatos();
+  Object.assign(destino, destinoGuardado);
+  let ok=0, fallas=0;
+  const pendientes=DB.filter(r=>{
+    const c=actual(r,'_cirOrig','cirujano'), a=actual(r,'_aneOrig','anestesiologo');
+    return nuevo(c)!==c || nuevo(a)!==a;
+  });
+  for(let i=0;i<pendientes.length;i++){
+    const r=pendientes[i];
+    showLoader(`🩺 Homologando nombres… ${i+1} de ${pendientes.length}`);
+    const nc=nuevo(actual(r,'_cirOrig','cirujano')), na=nuevo(actual(r,'_aneOrig','anestesiologo'));
+    const base = RAW_DB[String(r.id)];
+    if(!base){ fallas++; continue; }
+    const rec={...base, cirujano:nc, anestesiologo:na};  // registro tal cual está en la hoja + nombres nuevos
+    let res=await apiCall({action:'update',record:rec});
+    if(!res||!res.ok){ await new Promise(x=>setTimeout(x,1200)); res=await apiCall({action:'update',record:rec}); }
+    if(res&&res.ok){ r.cirujano=nc; r.anestesiologo=na; r._cirOrig=nc; r._aneOrig=na; base.cirujano=nc; base.anestesiologo=na; ok++; } else fallas++;
+  }
+  hideLoader();
+  construirMapaMedicos();
+  DB.forEach(r=>{ if(r.cirujano) r.cirujano=canonMed(r.cirujano); if(r.anestesiologo) r.anestesiologo=canonMed(r.anestesiologo); });
+  sincronizarCatalogoDesdeBD();
+  toast(fallas ? `⚠ ${ok} actualizados, ${fallas} con error de conexión — vuelve a ejecutar para completarlos` : `✓ ${ok} registros homologados`, fallas?'error':'success');
+  initBuscador(); render();
+}
 
 // ── CATÁLOGO DE CIRUJANOS — siempre desde Google Sheets ─────────────────────
 // Al cargar la app se reconstruye el catálogo EXCLUSIVAMENTE desde los datos
@@ -1926,12 +2312,50 @@ document.getElementById('btnNueva').onclick=()=>{
 
 const CAT_KEY = 'cmga_cirujanos_v2'; // v2 para limpiar la caché anterior
 
-function normalizarNombre(n){
-  // "dr. antonio cruz" → "Dr. Antonio Cruz"
-  return (n||'').trim().replace(/\s+/g,' ')
-    .toLowerCase()
-    .replace(/(^|\s)\S/g, c => c.toUpperCase());
+// ── Nombres de médicos: "dr juan perez", "DR. JUAN PÉREZ" y "Juan Pérez"
+//    se reconocen como la misma persona y se muestran como "Dr. Juan Pérez".
+const PARTICULAS = ['de','del','la','las','los','y','e','van','von','da','di'];
+// Correcciones de errores tipográficos conocidos (clave sin acentos, minúsculas, sin "Dr.")
+const CORRECCIONES_CIRUJANOS = {
+  'erick mier'     : 'Erik Mier',
+  'huberto alonso' : 'Humberto Alonso',
+};
+function partesMedico(n){
+  let t=String(n||'').replace(/\s+/g,' ').trim().replace(/[.,;:]+$/,'');
+  let pref='';
+  const m=t.match(/^(dra|dr|doctora|doctor)(\.|\s|\.\s)+/i);
+  if(m){ pref=/^(dra|doctora)/i.test(m[1])?'Dra.':'Dr.'; t=t.slice(m[0].length).trim(); }
+  const base=t.toLowerCase().split(' ').filter(Boolean)
+    .map((w,i)=> i>0&&PARTICULAS.includes(w) ? w : w.charAt(0).toUpperCase()+w.slice(1)).join(' ');
+  let key=sinAcentos(base).toLowerCase();
+  let baseFinal=base;
+  if(CORRECCIONES_CIRUJANOS[key]){ baseFinal=CORRECCIONES_CIRUJANOS[key]; key=sinAcentos(baseFinal).toLowerCase(); }
+  return {pref, base:baseFinal, key};
 }
+let MAPA_MED = {}; // clave → nombre homologado
+let RAW_DB = {};   // copia exacta de cada registro como está en la hoja (para homologar sin tocar otros campos)
+function construirMapaMedicos(){
+  const g={};
+  DB.forEach(r=>[r._cirOrig??r.cirujano, r._aneOrig??r.anestesiologo].forEach(raw=>{
+    if(!String(raw||'').trim()) return;
+    const p=partesMedico(raw); if(!p.key) return;
+    const x=g[p.key]=g[p.key]||{dr:0,dra:0,bases:{}};
+    if(p.pref==='Dra.') x.dra++; else if(p.pref==='Dr.') x.dr++;
+    x.bases[p.base]=(x.bases[p.base]||0)+1;
+  }));
+  MAPA_MED={};
+  Object.entries(g).forEach(([k,x])=>{
+    const acentos=b=>(b.match(/[áéíóúñü]/gi)||[]).length;
+    const base=Object.entries(x.bases).sort((a,b)=>b[1]-a[1]||acentos(b[0])-acentos(a[0]))[0][0];
+    MAPA_MED[k]=(x.dra>x.dr?'Dra.':'Dr.')+' '+base;
+  });
+}
+function canonMed(n){
+  if(!String(n||'').trim()) return '';
+  const p=partesMedico(n);
+  return MAPA_MED[p.key] || ((p.pref||'Dr.')+' '+p.base);
+}
+function normalizarNombre(n){ return canonMed(n); }
 
 function getCatalogoCirujanos(){
   try { return JSON.parse(localStorage.getItem(CAT_KEY)) || []; }
@@ -2012,17 +2436,7 @@ function asegurarCirujanoEnCatalogo(nombre){
   }
 }
 
-// Correcciones explícitas de nombres con error tipográfico conocido
-// Clave: nombre incorrecto en minúsculas → valor: nombre correcto
-const CORRECCIONES_CIRUJANOS = {
-  'dr. erick mier'  : 'Dr. Erik Mier',
-  'dr. huberto alonso': 'Dr. Humberto Alonso',
-};
-
-function corregirNombre(nombre){
-  const key = normalizarNombre(nombre).toLowerCase();
-  return CORRECCIONES_CIRUJANOS[key] || normalizarNombre(nombre);
-}
+function corregirNombre(nombre){ return canonMed(nombre); }
 
 // Reconstruir catálogo COMPLETAMENTE desde Sheets en cada carga
 // Reemplaza el localStorage con los nombres normalizados de Sheets
@@ -2044,6 +2458,7 @@ function sincronizarCatalogoDesdeBD(){
 
 // Inicializar con lo que haya en localStorage mientras carga Sheets
 poblarSelectCirujano('f-cirujano');
+document.getElementById('f-especialidad').innerHTML = optsEspecialidad('');
 
 (function initConcentrado(){
   const h=new Date(), sa=document.getElementById('con-anio');
