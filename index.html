@@ -222,6 +222,7 @@ tr.clic{cursor:pointer} tr.clic:hover td{background:var(--az3)}
 </div>
 <div style="margin-left:auto;display:flex;align-items:center;gap:8px;padding-left:12px">
 <span id="modeLabel" style="background:var(--amarillo3);color:var(--amarillo);padding:4px 10px;border-radius:99px;font-size:11px;font-weight:500">Solo lectura</span>
+<button id="syncBtn" onclick="sincronizarPendientes(true)" title="Estado de sincronización con Google Sheets" style="border:none;padding:4px 10px;border-radius:99px;cursor:pointer;font-size:11px;font-weight:600;font-family:inherit;background:#DCFCE7;color:#166534">☁️ Sincronizado</button>
 <button id="lockBtn" onclick="toggleLock()" style="background:rgba(255,255,255,.15);border:none;color:#fff;padding:5px 10px;border-radius:6px;cursor:pointer;font-size:12px;font-family:inherit">🔒 Ingresar PIN</button>
 </div>
 </nav>
@@ -701,6 +702,7 @@ function escAttr(v){ return String(v==null?'':v).replace(/&/g,'&amp;').replace(/
 const SH = 32;
 
 let diaDB = {}, DB = [];
+let MODO_OFFLINE = false;
 let nid = 1;
 let pinDesbloqueado = false;
 let pinCallback = null;
@@ -731,7 +733,71 @@ function jsonpRequest(url){
   });
 }
 
+// ════════ COLA DE CAMBIOS SIN CONEXIÓN ════════
+// Si internet falla, cada alta/edición/eliminación se guarda en este equipo
+// (localStorage) y se reenvía automáticamente cuando vuelve la conexión.
+const PEND_KEY='cmga_qx_pendientes_v1', CACHE_KEY='cmga_qx_cache_v1';
+function leerPend(){ try{ return JSON.parse(localStorage.getItem(PEND_KEY))||[]; }catch(e){ return []; } }
+function guardarPend(a){ try{ localStorage.setItem(PEND_KEY, JSON.stringify(a)); }catch(e){ console.error(e); } actualizarSyncBtn(); }
+function limpiarRec(r){ const o={...r}; delete o._cirOrig; delete o._aneOrig; return o; }
+function encolar(payload){
+  const id=String(payload.record?payload.record.id:payload.id);
+  // Se conserva solo el cambio más reciente de cada cirugía (el registro va completo)
+  let q=leerPend().filter(x=>x.id!==id);
+  q.push({id, action:payload.action, record:payload.record?limpiarRec(payload.record):null, ts:Date.now()});
+  guardarPend(q);
+}
+function quitarPend(id, ts){ guardarPend(leerPend().filter(x=>!(x.id===String(id)&&(ts==null||x.ts<=ts)))); }
+async function envioDirecto(payload){
+  const params = new URLSearchParams();
+  params.append('action', payload.action);
+  if(payload.record) params.append('record', JSON.stringify(limpiarRec(payload.record)));
+  if(payload.id !== undefined) params.append('id', payload.id);
+  return await jsonpRequest(GAS_URL + '?' + params.toString());
+}
+let sincronizando=false;
+async function sincronizarPendientes(manual=false){
+  if(sincronizando) return;
+  let q=leerPend();
+  if(!q.length){ if(manual) toast('Todo está guardado en la nube ☁️'); return; }
+  sincronizando=true; actualizarSyncBtn();
+  let enviados=0;
+  for(const op of q){
+    try{
+      const res=await envioDirecto(op.action==='delete'?{action:'delete',id:op.id}:{action:op.action,record:op.record});
+      if(res&&res.ok){ quitarPend(op.id, op.ts); enviados++; } else break;
+    }catch(e){ break; }
+  }
+  sincronizando=false;
+  const rest=leerPend().length;
+  actualizarSyncBtn();
+  if(enviados) toast(rest?`☁️ ${enviados} cambio(s) enviados · faltan ${rest}`:`☁️ ${enviados} cambio(s) pendientes ya se guardaron en la nube`, rest?'error':'success');
+  else if(manual) toast('⚠ Sin conexión con Google Sheets — se reintentará automáticamente','error');
+}
+function actualizarSyncBtn(){
+  const b=document.getElementById('syncBtn'); if(!b) return;
+  const n=leerPend().length;
+  if(sincronizando){ b.textContent='🔄 Sincronizando…'; b.style.background='#DBEAFE'; b.style.color='#1E40AF'; return; }
+  if(n){ b.textContent=`⚠ ${n} sin guardar en la nube`; b.style.background='#FEE2E2'; b.style.color='#991B1B'; b.title='Toca para reintentar ahora. Estos cambios solo existen en este equipo hasta que se sincronicen.'; }
+  else if(!navigator.onLine){ b.textContent='📴 Sin internet'; b.style.background='#FEF3C7'; b.style.color='#92400E'; }
+  else { b.textContent='☁️ Sincronizado'; b.style.background='#DCFCE7'; b.style.color='#166534'; b.title='Todos los cambios están guardados en Google Sheets'; }
+}
+// Aplica los cambios pendientes sobre los datos descargados (para verlos aunque se refresque la página)
+function aplicarPendientesADB(){
+  leerPend().forEach(op=>{
+    const i=DB.findIndex(x=>String(x.id)===op.id);
+    if(op.action==='delete'){ if(i>-1) DB.splice(i,1); }
+    else if(op.record){ const r={...op.record}; if(i>-1) DB[i]=r; else DB.push(r); }
+  });
+}
+window.addEventListener('online', ()=>{ actualizarSyncBtn(); sincronizarPendientes(); });
+window.addEventListener('offline', actualizarSyncBtn);
+setInterval(()=>{ if(leerPend().length) sincronizarPendientes(); }, 30000);
+window.addEventListener('beforeunload', e=>{ if(leerPend().length){ e.preventDefault(); e.returnValue=''; } });
+
 async function apiCall(payload){
+  const esEscritura = ['save','update','delete'].includes(payload.action);
+  const tsEnvio = Date.now();
   try{
     const params = new URLSearchParams();
     params.append('action', payload.action);
@@ -744,16 +810,41 @@ async function apiCall(payload){
     if(res && res.ok && payload.record){
       const o=DB.find(x=>String(x.id)===String(payload.record.id));
       if(o){ o._cirOrig=String(payload.record.cirujano||''); o._aneOrig=String(payload.record.anestesiologo||''); }
+      if(typeof RAW_DB!=='undefined') RAW_DB[String(payload.record.id)]=limpiarRec(payload.record);
+    }
+    if(esEscritura){
+      if(res && res.ok){ quitarPend(payload.record?payload.record.id:payload.id, tsEnvio); guardarCache(); }
+      else { encolar(payload); guardarCache(); }
     }
     return res;
-  } catch(e){ console.error(e); return {ok:false}; }
+  } catch(e){
+    console.error(e);
+    if(esEscritura){ encolar(payload); guardarCache(); }
+    return {ok:false, encolado:esEscritura};
+  }
+}
+// Copia local de la base para poder ver la programación aunque no haya internet
+function guardarCache(){
+  try{ localStorage.setItem(CACHE_KEY, JSON.stringify({ts:Date.now(), data:DB.map(limpiarRec)})); }catch(e){ console.warn('No se pudo guardar copia local', e); }
 }
 
 async function cargarDatos(){
   showLoader('🔄 Sincronizando con Google Sheets…');
   try{
-    const data = await jsonpRequest(GAS_URL + '?action=getAll');
-    DB = Array.isArray(data) ? data : [];
+    let data;
+    try{
+      data = await jsonpRequest(GAS_URL + '?action=getAll');
+      if(!Array.isArray(data)) throw new Error('Respuesta inválida');
+      try{ localStorage.setItem(CACHE_KEY, JSON.stringify({ts:Date.now(), data})); }catch(e){}
+      MODO_OFFLINE=false;
+    }catch(err){
+      // Sin conexión: mostrar la última copia descargada en este equipo
+      let c=null; try{ c=JSON.parse(localStorage.getItem(CACHE_KEY)); }catch(e){}
+      if(!c||!Array.isArray(c.data)) throw err;
+      data=c.data; MODO_OFFLINE=new Date(c.ts);
+    }
+    DB = JSON.parse(JSON.stringify(data));
+    aplicarPendientesADB();
     nid = DB.length ? Math.max(...DB.map(x=>Number(x.id)||0))+1 : 1;
     diaDB={};
     DB.forEach(r=>{ RAW_DB[String(r.id)]={...r}; r._cirOrig=String(r.cirujano||'').trim(); r._aneOrig=String(r.anestesiologo||'').trim(); });
@@ -791,8 +882,14 @@ async function cargarDatos(){
       const f=r.fecha||r._fecha;
       if(f){if(!diaDB[f])diaDB[f]=[];diaDB[f].push(r);}
     });
-  } catch(e){ console.error(e); }
+  } catch(e){
+    console.error(e);
+    toast('⚠ No se pudo conectar con Google Sheets y no hay copia guardada en este equipo','error');
+  }
   hideLoader();
+  mostrarAvisoOffline();
+  actualizarSyncBtn();
+  if(leerPend().length) setTimeout(()=>sincronizarPendientes(), 500);
   sincronizarCatalogoDesdeBD();  // enriquece el catálogo con cirujanos ya en la BD
   render();
   actualizarBadgeInsumos();
@@ -801,6 +898,12 @@ async function cargarDatos(){
   if(document.getElementById('page-buscar').classList.contains('active')) initBuscador();
 }
 
+function mostrarAvisoOffline(){
+  let el=document.getElementById('offlineBar');
+  if(!MODO_OFFLINE){ if(el) el.remove(); return; }
+  if(!el){ el=document.createElement('div'); el.id='offlineBar'; el.style.cssText='background:#FEF3C7;color:#78350F;border-bottom:1px solid #F59E0B;padding:8px 14px;font-size:12px;text-align:center'; document.querySelector('nav').after(el); }
+  el.innerHTML=`📴 <b>Sin conexión con Google Sheets.</b> Se muestra la copia guardada en este equipo (${MODO_OFFLINE.toLocaleString('es-MX')}). Lo que registres se guardará aquí y se enviará al volver el internet. <button onclick="cargarDatos()" style="margin-left:8px;border:1px solid #F59E0B;background:#fff;border-radius:6px;padding:2px 8px;cursor:pointer;font-family:inherit;font-size:11px">Reintentar</button>`;
+}
 function saveDia(){}
 function saveDB(){}
 
@@ -1170,7 +1273,7 @@ async function chSt(id,est){
       await new Promise(r=>setTimeout(r,1500));
       const res2 = await apiCall({action:'update', record:{...recCompleto, estado:est}});
       hideLoader();
-      toast(res2&&res2.ok ? 'Estatus actualizado ✓' : '⚠ Guardado localmente — verifica conexión', res2&&res2.ok?'success':'error');
+      toast(res2&&res2.ok ? 'Estatus actualizado ✓' : '⚠ Sin conexión: guardado en este equipo, se enviará al volver el internet', res2&&res2.ok?'success':'error');
     }
   }
   render();
@@ -1189,7 +1292,7 @@ async function setCampoRapido(id,campo,valor){
   let res=await apiCall({action:'update',record:{...rec}});
   if(!res||!res.ok){ await new Promise(r=>setTimeout(r,1500)); res=await apiCall({action:'update',record:{...rec}}); }
   hideLoader();
-  toast(res&&res.ok?'Guardado ✓':'⚠ Guardado localmente — verifica conexión', res&&res.ok?'success':'error');
+  toast(res&&res.ok?'Guardado ✓':'⚠ Sin conexión: guardado en este equipo, se enviará al volver el internet', res&&res.ok?'success':'error');
   openDetail(id); render();
   if(document.getElementById('page-base').classList.contains('active')) renderTabla();
 }
@@ -1217,7 +1320,7 @@ async function guardarEnDB(id){
       await new Promise(r=>setTimeout(r,1500));
       res=await apiCall({action:'update',record:rec});
     }
-    toast(res&&res.ok?'Registro actualizado ✓':'⚠ Error al guardar — reintenta', res&&res.ok?'success':'error');
+    toast(res&&res.ok?'Registro actualizado ✓':'⚠ Sin conexión: guardado en este equipo, se enviará al volver el internet', res&&res.ok?'success':'error');
   } else {
     DB.push(rec);
     res=await apiCall({action:'save',record:rec});
@@ -1225,7 +1328,7 @@ async function guardarEnDB(id){
       await new Promise(r=>setTimeout(r,1500));
       res=await apiCall({action:'save',record:rec});
     }
-    toast(res&&res.ok?'Guardado en la nube ☁️':'⚠ Error al guardar — reintenta', res&&res.ok?'success':'error');
+    toast(res&&res.ok?'Guardado en la nube ☁️':'⚠ Sin conexión: guardado en este equipo, se enviará al volver el internet', res&&res.ok?'success':'error');
   }
   hideLoader(); closeModal();
 }
@@ -1424,11 +1527,11 @@ async function saveFrm(id){
     } else { if(i>-1)s[i]=d; sS(s); }
     const idx=DB.findIndex(x=>String(x.id)===String(id));if(idx>-1)DB[idx]=d;
     const ok=await enviar('update');
-    toast(ok?'Cirugía actualizada ✓':'⚠ Guardado localmente — verifica conexión', ok?'success':'error');
+    toast(ok?'Cirugía actualizada ✓':'⚠ Sin conexión: guardado en este equipo, se enviará al volver el internet', ok?'success':'error');
   } else {
     d.id=nuevoId(); (diaDB[d.fecha]=diaDB[d.fecha]||[]).push(d); DB.push(d);
     const ok=await enviar('save');
-    toast(ok?'Cirugía registrada ✓':'⚠ Guardado localmente — verifica conexión', ok?'success':'error');
+    toast(ok?'Cirugía registrada ✓':'⚠ Sin conexión: guardado en este equipo, se enviará al volver el internet', ok?'success':'error');
   }
   hideLoader(); closeModal(); render();
   if(document.getElementById('page-base').classList.contains('active')) renderTabla();
@@ -1570,12 +1673,11 @@ function guardarCirugia(){
   asegurarCirujanoEnCatalogo(rec.cirujano);
   poblarSelectCirujano('f-cirujano', rec.cirujano);
   showLoader('💾 Guardando en Google Sheets…');
-  apiCall({action:'save', record:rec}).then(()=>{
+  apiCall({action:'save', record:rec}).then(async res=>{
+    if(!res||!res.ok){ await new Promise(x=>setTimeout(x,1500)); res=await apiCall({action:'save', record:rec}); }
     hideLoader();
-    toast('✓ Cirugía registrada y guardada en la nube ☁️');
-  }).catch(()=>{
-    hideLoader();
-    toast('✓ Registrada localmente (sin conexión)','error');
+    if(res&&res.ok) toast('✓ Cirugía registrada y guardada en la nube ☁️');
+    else toast('⚠ Sin conexión: la cirugía quedó guardada en ESTE equipo y se enviará sola al volver el internet','error');
   });
   limpiarForm();
   render();
