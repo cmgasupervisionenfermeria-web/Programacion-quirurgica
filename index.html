@@ -350,6 +350,7 @@ style="background:var(--gris1);color:var(--gris5);cursor:default">
 <div class="form-group full" id="evento-adverso-desc-wrap" style="display:none">
 <label>Descripción del Evento Adverso</label>
 <input type="text" id="f-evento-adverso-desc" placeholder="Describa el evento adverso ocurrido">
+<button type="button" onclick="abrirReporteEventoAdversoRegistro()" style="margin-top:6px;background:#991B1B;color:#fff;border:none;padding:7px 12px;border-radius:7px;font-size:11.5px;font-weight:600;cursor:pointer">🚨 Reportar en el sistema de Eventos Adversos</button>
 </div>
 </div>
 <div class="section-lbl">Insumos</div>
@@ -478,6 +479,50 @@ style="background:var(--gris1);color:var(--gris5);cursor:default">
 
 <script>
 const GAS_URL = 'https://script.google.com/macros/s/AKfycbwyQdQl-QuUcek0m7_8BvGAPU9kyIqkwxuaFLvh3K--u8xUGLqlXA-ev78sbyBixuK3NA/exec';
+
+// Acceso rápido al sistema real de Eventos Adversos (folio, análisis de
+// causa raíz, algoritmo de Naranjo, etc.). El campo "Evento Adverso" de
+// esta programación no se modifica; este botón solo abre el formulario
+// de Eventos Adversos en una pestaña nueva, con los datos de la cirugía
+// ya precargados.
+const URL_EVENTOS_ADVERSOS = 'https://cmgasupervisionenfermeria-web.github.io/NOTIFICACION-DE-EVENTOS-ADVERSOS/';
+function abrirReporteEventoAdverso(datos){
+  datos = datos || {};
+  const params = new URLSearchParams();
+  if(datos.origen)   params.set('origen', datos.origen);
+  if(datos.area)     params.set('area', datos.area);
+  if(datos.paciente) params.set('paciente', datos.paciente);
+  if(datos.fecha)    params.set('fecha', datos.fecha);
+  if(datos.turno)    params.set('turno', datos.turno);
+  if(datos.medico)   params.set('medico', datos.medico);
+  if(datos.nota)     params.set('nota', datos.nota);
+  const qs = params.toString();
+  window.open(URL_EVENTOS_ADVERSOS + (qs ? ('?' + qs) : ''), '_blank');
+}
+function abrirReporteEventoAdversoRegistro(){
+  const exp = document.getElementById('f-expediente').value;
+  const pac = document.getElementById('f-paciente').value;
+  const cir = document.getElementById('f-cirujano').value;
+  abrirReporteEventoAdverso({
+    origen: 'quirurgica',
+    area: 'Quirófano',
+    paciente: pac + (exp ? (' - Exp. ' + exp) : ''),
+    fecha: document.getElementById('f-fecha').value,
+    medico: cir
+  });
+}
+let _sgModalActual = null;
+function abrirReporteEventoAdversoModal(){
+  const sg = _sgModalActual || {};
+  const campoFecha = document.getElementById('efecha');
+  abrirReporteEventoAdverso({
+    origen: 'quirurgica',
+    area: 'Quirófano',
+    paciente: (sg.paciente || '') + (sg.expediente ? (' - Exp. ' + sg.expediente) : ''),
+    fecha: campoFecha ? campoFecha.value : (sg.fecha || ''),
+    medico: sg.cirujano || ''
+  });
+}
 const PIN_CORRECTO = 'QXCMG26';
 const QXS = ['Quirófano 1','Quirófano 2','Quirófano 3'];
 const ESTADOS = ['Pendiente','En curso','Completada','Cancelada','Suspendida','Fallecimiento'];
@@ -1337,6 +1382,7 @@ function openEdit(id){ const sg=gS().find(x=>String(x.id)===String(id))||{}; ope
 
 function openForm(sg, modoCierre=false){
   sg=sg||{}; const isN=!sg.id;
+  _sgModalActual = sg;
   const falt=faltaCierre(sg);
   const sgHoraNorm = normHora(sg.hora);
   const horasLista = (sgHoraNorm && !HORAS30.includes(sgHoraNorm)) ? [...HORAS30, sgHoraNorm].sort() : HORAS30;
@@ -1365,6 +1411,7 @@ function openForm(sg, modoCierre=false){
       <div class="form-group full" id="eeventoadversodesc-wrap" style="display:${sg.eventoAdverso==='Sí'?'flex':'none'};flex-direction:column;gap:3px">
         <label>Descripción del Evento Adverso</label>
         <input id="eeventoadversodesc" value="${sg.eventoAdversoDesc||''}" placeholder="Describa el evento adverso ocurrido">
+        <button type="button" onclick="abrirReporteEventoAdversoModal()" style="margin-top:2px;background:#991B1B;color:#fff;border:none;padding:7px 12px;border-radius:7px;font-size:11.5px;font-weight:600;cursor:pointer">🚨 Reportar en el sistema de Eventos Adversos</button>
       </div>
     </div>`+
 
