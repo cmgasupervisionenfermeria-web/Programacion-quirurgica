@@ -183,20 +183,21 @@ tbody tr:last-child{border-bottom:none}
 .timeline{grid-template-columns:44px 1fr 1fr 1fr}
 }
 /* Calendario */
-.cal-panel{background:#fff;border:1px solid var(--gris2);border-radius:var(--r);box-shadow:var(--shadow);padding:12px;margin-bottom:14px;display:none}
+.cal-wrap{position:relative}
+.cal-panel{position:absolute;top:calc(100% + 6px);left:0;z-index:150;width:min(380px,calc(100vw - 32px));background:#fff;border:1px solid var(--gris2);border-radius:12px;box-shadow:0 12px 32px rgba(15,23,42,.18);padding:10px;display:none}
 .cal-panel.vis{display:block}
 .cal-hdr{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px}
 .cal-hdr b{font-size:14px;text-transform:capitalize}
 .cal-hdr button{background:#fff;border:1px solid var(--gris3);border-radius:7px;padding:5px 10px;cursor:pointer;font-family:inherit;font-size:13px}
 .cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:4px}
 .cal-dow{font-size:10px;font-weight:700;color:var(--gris4);text-align:center;text-transform:uppercase;padding:2px 0}
-.cal-day{position:relative;min-height:52px;border:1px solid var(--gris2);border-radius:8px;padding:4px 5px;cursor:pointer;background:#fff;font-size:12px;display:flex;flex-direction:column;gap:2px;transition:background .1s}
+.cal-day{position:relative;min-height:40px;border:1px solid var(--gris2);border-radius:7px;padding:3px 4px;cursor:pointer;background:#fff;font-size:12px;display:flex;flex-direction:column;gap:2px;transition:background .1s}
 .cal-day:hover{border-color:var(--az2)}
 .cal-day.otro{opacity:.35}
 .cal-day.hoy{box-shadow:inset 0 0 0 2px var(--az2)}
 .cal-day.sel{background:var(--az)!important;color:#fff;border-color:var(--az)}
 .cal-day .n{font-weight:600}
-.cal-day .c{font-size:10px;border-radius:99px;padding:1px 6px;align-self:flex-start;background:#fff;color:var(--az);border:1px solid var(--az3)}
+.cal-day .c{font-size:9px;border-radius:99px;padding:0 5px;align-self:flex-start;background:#fff;color:var(--az);border:1px solid var(--az3)}
 .cal-day.sel .c{background:rgba(255,255,255,.25);color:#fff;border-color:transparent}
 .cal-day .x{font-size:9px;color:var(--rojo2)}
 .cal-day.sel .x{color:#FECACA}
@@ -208,7 +209,7 @@ tbody tr:last-child{border-bottom:none}
 .chip{display:inline-block;border:1px solid var(--gris3);background:#fff;border-radius:99px;padding:4px 10px;font-size:11px;cursor:pointer;margin:0 4px 4px 0;font-family:inherit}
 .chip.on{background:var(--az);color:#fff;border-color:var(--az)}
 tr.clic{cursor:pointer} tr.clic:hover td{background:var(--az3)}
-@media(max-width:700px){.cal-day{min-height:44px;padding:3px}.cal-day .c{padding:0 4px}.bus-grid>div[style*="span 2"]{grid-column:auto!important}}
+@media(max-width:700px){.cal-day{min-height:38px;padding:2px 3px}.cal-day .c{padding:0 3px}.bus-grid>div[style*="span 2"]{grid-column:auto!important}}
 </style>
 </head>
 <body>
@@ -244,6 +245,7 @@ style="width:100%;padding:12px;font-size:20px;text-align:center;border:2px solid
 
 <div class="page active" id="page-dia">
 <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:14px">
+<div class="cal-wrap">
 <div class="date-nav" style="margin:0">
 <button id="prevDay">‹</button>
 <span class="date-lbl" id="dateLabel" onclick="toggleCal()" style="cursor:pointer" title="Abrir calendario"></span>
@@ -251,9 +253,10 @@ style="width:100%;padding:12px;font-size:20px;text-align:center;border:2px solid
 <button onclick="toggleCal()" title="Calendario del mes">📅</button>
 <button onclick="irHoy()" style="font-size:12px">Hoy</button>
 </div>
+<div class="cal-panel" id="calPanel"></div>
+</div>
 <button class="btn btn-primary" id="btnNueva">+ Nueva cirugía</button>
 </div>
-<div class="cal-panel" id="calPanel"></div>
 <div id="alertBanner"></div>
 <div class="stats-row" id="statsRow"></div>
 <div class="view-tabs">
@@ -336,7 +339,7 @@ style="background:var(--gris1);color:var(--gris5);cursor:default">
 <div class="form-group"><label>Anestesiólogo</label><input type="text" id="f-anestesiologo" placeholder="Dr. / Dra."></div>
 <div class="form-group"><label>Instrumentista</label><input type="text" id="f-instrumentista" placeholder="Enf. / Nombre"></div>
 <div class="form-group"><label>Estatus</label>
-<select id="f-estatus" onchange="toggleCancel()"><option value="">— Selecciona —</option><option>Pendiente</option><option>En curso</option><option>Completada</option><option>Cancelada</option><option>Suspendida</option><option>Fallecimiento</option></select>
+<select id="f-estatus" onchange="toggleCancel()"><option value="">— Selecciona —</option><option>Pendiente</option><option>En curso</option><option>Completada</option><option>Cancelada</option><option>Fallecimiento</option></select>
 </div>
 </div>
 <div class="section-lbl">Indicadores de calidad</div>
@@ -395,7 +398,10 @@ style="background:var(--gris1);color:var(--gris5);cursor:default">
 <div class="page" id="page-base">
 <div class="page-hdr">
 <div><h1>Base de Datos</h1><p><span id="total-reg">0</span> registros totales</p></div>
+<div style="display:flex;gap:8px;flex-wrap:wrap">
+<button class="btn btn-sm" id="btnSuspCanc" style="display:none;background:#FEE2E2;color:#991B1B;border:1px solid #FCA5A5" onclick="requirePin(convertirSuspendidas)"></button>
 <button class="btn btn-primary btn-sm" onclick="exportarCSV()">↓ Exportar CSV</button>
+</div>
 </div>
 <div class="card">
 <div class="filters">
@@ -404,7 +410,7 @@ style="background:var(--gris1);color:var(--gris5);cursor:default">
 <option value="">Todos los Qx</option><option>Quirófano 1</option><option>Quirófano 2</option><option>Quirófano 3</option>
 </select>
 <select id="fil-est" onchange="renderTabla()" style="width:120px">
-<option value="">Todos</option><option>Pendiente</option><option>En curso</option><option>Completada</option><option>Cancelada</option><option>Suspendida</option><option>Fallecimiento</option><option value="__cierre">📝 Por cerrar</option>
+<option value="">Todos</option><option>Pendiente</option><option>En curso</option><option>Completada</option><option>Cancelada</option><option>Fallecimiento</option><option value="__cierre">📝 Por cerrar</option>
 </select>
 <input type="text" id="fil-buscar" placeholder="🔍 Expediente o paciente…" oninput="renderTabla()" style="flex:1;min-width:160px">
 <button class="btn btn-ghost btn-sm" onclick="limpFiltros()">✕</button>
@@ -437,7 +443,7 @@ style="background:var(--gris1);color:var(--gris5);cursor:default">
 <div style="grid-column:span 2"><label>Texto libre</label><input id="b-texto" placeholder="🔍 Paciente, expediente, procedimiento, médico…" oninput="renderBuscador()"></div>
 <div><label>Especialidad</label><select id="b-esp" onchange="renderBuscador()"></select></div>
 <div><label>Cirujano</label><select id="b-med" onchange="renderBuscador()"></select></div>
-<div><label>Estatus</label><select id="b-est" onchange="renderBuscador()"><option value="">Todos</option><option>Pendiente</option><option>En curso</option><option>Completada</option><option>Cancelada</option><option>Suspendida</option><option>Fallecimiento</option><option value="__real">Realizadas (Completada + Fallecimiento)</option></select></div>
+<div><label>Estatus</label><select id="b-est" onchange="renderBuscador()"><option value="">Todos</option><option>Pendiente</option><option>En curso</option><option>Completada</option><option>Cancelada</option><option>Fallecimiento</option><option value="__real">Realizadas (Completada + Fallecimiento)</option></select></div>
 <div><label>Desde</label><input type="date" id="b-desde" onchange="marcarRango('');renderBuscador()"></div>
 <div><label>Hasta</label><input type="date" id="b-hasta" onchange="marcarRango('');renderBuscador()"></div>
 </div>
@@ -525,7 +531,8 @@ function abrirReporteEventoAdversoModal(){
 }
 const PIN_CORRECTO = 'QXCMG26';
 const QXS = ['Quirófano 1','Quirófano 2','Quirófano 3'];
-const ESTADOS = ['Pendiente','En curso','Completada','Cancelada','Suspendida','Fallecimiento'];
+const ESTADOS = ['Pendiente','En curso','Completada','Cancelada','Fallecimiento'];
+// "Suspendida" ya no se ofrece como opción; solo se muestra en registros antiguos que lo tengan.
 // Catálogo de especialidades quirúrgicas (se conservan los nombres que ya existían
 // en la base para no alterar los registros guardados).
 const ESPECIALIDADES_BASE = [
@@ -605,7 +612,7 @@ function normCS(v){
 }
 function normEstado(v){
   const t=(v==null?'':String(v)).trim().toLowerCase();
-  const m={'pendiente':'Pendiente','en curso':'En curso','en-curso':'En curso','completada':'Completada','realizada':'Completada','cancelada':'Cancelada','suspendida':'Suspendida','fallecimiento':'Fallecimiento'};
+  const m={'pendiente':'Pendiente','en curso':'En curso','en-curso':'En curso','completada':'Completada','realizada':'Completada','cancelada':'Cancelada','suspendida':'Cancelada','__x':'Suspendida','fallecimiento':'Fallecimiento'};
   return m[t]||String(v||'').trim();
 }
 function normEsp(v){
@@ -822,6 +829,11 @@ async function sincronizarPendientes(manual=false){
 function actualizarSyncBtn(){
   const b=document.getElementById('syncBtn'); if(!b) return;
   const n=leerPend().length;
+  const corto = window.innerWidth < 700; // en celular solo ícono y número
+  if(sincronizando){ b.textContent=corto?'🔄':'🔄 Sincronizando…'; b.style.background='#DBEAFE'; b.style.color='#1E40AF'; return; }
+  if(n){ b.textContent=corto?`⚠ ${n}`:`⚠ ${n} sin guardar en la nube`; b.style.background='#FEE2E2'; b.style.color='#991B1B'; b.title='Toca para reintentar ahora. Estos cambios solo existen en este equipo hasta que se sincronicen.'; return; }
+  if(!navigator.onLine){ b.textContent=corto?'📴':'📴 Sin internet'; b.style.background='#FEF3C7'; b.style.color='#92400E'; return; }
+  b.textContent=corto?'☁️':'☁️ Sincronizado'; b.style.background='#DCFCE7'; b.style.color='#166534'; b.title='Todos los cambios están guardados en Google Sheets'; return;
   if(sincronizando){ b.textContent='🔄 Sincronizando…'; b.style.background='#DBEAFE'; b.style.color='#1E40AF'; return; }
   if(n){ b.textContent=`⚠ ${n} sin guardar en la nube`; b.style.background='#FEE2E2'; b.style.color='#991B1B'; b.title='Toca para reintentar ahora. Estos cambios solo existen en este equipo hasta que se sincronicen.'; }
   else if(!navigator.onLine){ b.textContent='📴 Sin internet'; b.style.background='#FEF3C7'; b.style.color='#92400E'; }
@@ -837,6 +849,7 @@ function aplicarPendientesADB(){
 }
 window.addEventListener('online', ()=>{ actualizarSyncBtn(); sincronizarPendientes(); });
 window.addEventListener('offline', actualizarSyncBtn);
+window.addEventListener('resize', actualizarSyncBtn);
 setInterval(()=>{ if(leerPend().length) sincronizarPendientes(); }, 30000);
 window.addEventListener('beforeunload', e=>{ if(leerPend().length){ e.preventDefault(); e.returnValue=''; } });
 
@@ -933,6 +946,7 @@ async function cargarDatos(){
   }
   hideLoader();
   mostrarAvisoOffline();
+  ajustarFiltroSuspendida();
   actualizarSyncBtn();
   if(leerPend().length) setTimeout(()=>sincronizarPendientes(), 500);
   sincronizarCatalogoDesdeBD();  // enriquece el catálogo con cirujanos ya en la BD
@@ -943,6 +957,34 @@ async function cargarDatos(){
   if(document.getElementById('page-buscar').classList.contains('active')) initBuscador();
 }
 
+// Registros que en la HOJA siguen guardados como "Suspendida"
+function suspendidasEnHoja(){
+  return Object.values(RAW_DB).filter(r=>String(r.estado||'').trim().toLowerCase()==='suspendida');
+}
+function ajustarFiltroSuspendida(){
+  const n=suspendidasEnHoja().length, b=document.getElementById('btnSuspCanc');
+  if(!b) return;
+  b.style.display = n ? '' : 'none';
+  b.textContent = `🔁 Cambiar ${n} "Suspendida" a "Cancelada" en la hoja`;
+}
+async function convertirSuspendidas(){
+  await cargarDatos(); // datos frescos antes de escribir
+  const lista=suspendidasEnHoja();
+  if(!lista.length){ toast('No hay cirugías guardadas como Suspendida ✓'); return; }
+  if(!confirm(`Se cambiará el estatus de ${lista.length} cirugía${lista.length!==1?'s':''} de "Suspendida" a "Cancelada" en la hoja.\n\nSolo cambia el estatus; el motivo y el resto de los datos quedan igual.\n\n¿Continuar?`)) return;
+  let ok=0, fallas=0;
+  for(let i=0;i<lista.length;i++){
+    showLoader(`🔁 Cambiando a Cancelada… ${i+1} de ${lista.length}`);
+    const rec={...lista[i], estado:'Cancelada'};
+    let res=await apiCall({action:'update',record:rec});
+    if(!res||!res.ok){ await new Promise(x=>setTimeout(x,1200)); res=await apiCall({action:'update',record:rec}); }
+    if(res&&res.ok){ RAW_DB[String(rec.id)].estado='Cancelada'; ok++; } else fallas++;
+  }
+  hideLoader();
+  ajustarFiltroSuspendida();
+  toast(fallas?`⚠ ${ok} cambiadas · ${fallas} quedaron en cola por falta de conexión y se enviarán solas`:`✓ ${ok} cirugías cambiadas a Cancelada`, fallas?'error':'success');
+  render(); if(document.getElementById('page-base').classList.contains('active')) renderTabla();
+}
 function mostrarAvisoOffline(){
   let el=document.getElementById('offlineBar');
   if(!MODO_OFFLINE){ if(el) el.remove(); return; }
@@ -1443,7 +1485,7 @@ function openForm(sg, modoCierre=false){
           <input id="einsconffecha" value="${escAttr(sg.insumosConfirmadoFecha)}" placeholder="Fecha de confirmación" style="flex:1;min-width:140px">
         </div>
       </div>
-      <div class="form-group full" id="emotivo-wrap" style="display:${esCancelOSusp(sg)||sg.motivo?'flex':'none'};flex-direction:column;gap:3px"><label>Motivo de cancelación / suspensión</label><input id="emotivo" value="${escAttr(sg.motivo)}" placeholder="Ej. Paciente no apto, falta de insumos, decisión del cirujano…"></div>
+      <div class="form-group full" id="emotivo-wrap" style="display:${esCancelOSusp(sg)||sg.motivo?'flex':'none'};flex-direction:column;gap:3px"><label>Motivo de cancelación</label><input id="emotivo" value="${escAttr(sg.motivo)}" placeholder="Ej. Paciente no apto, falta de insumos, decisión del cirujano…"></div>
       <div class="form-group full" id="epcancel-wrap" style="display:${esCancelOSusp(sg)||sg.personalCancel?'flex':'none'};flex-direction:column;gap:3px"><label>Personal que cancela</label><input id="epcancel" value="${escAttr(sg.personalCancel)}"></div>
     </div>`+
     `<div style="font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--gris4);padding:10px 0 8px;border-bottom:1px solid var(--gris2);margin-bottom:10px">Pieza Patológica</div>`+
@@ -2011,7 +2053,7 @@ function renderConcentrado(){
     `<div class="stat-card"><div class="stat-card-lbl">Programadas en el mes</div><div class="stat-card-val c-az">${programadas}</div><div class="stat-card-sub">${promDiario} por día activo</div></div>`+
     `<div class="stat-card"><div class="stat-card-lbl">Realizadas</div><div class="stat-card-val c-verde">${nR}</div><div class="stat-card-sub">${programadas?Math.round(nR/programadas*100):0}% del total${allRecs.filter(vencida).length?` · ⚠ ${allRecs.filter(vencida).length} ya pasaron y siguen pendientes/en curso`:''}</div></div>`+
     `<div class="stat-card"><div class="stat-card-lbl">Canceladas</div><div class="stat-card-val c-rojo">${canceladas.length}</div><div class="stat-card-sub">${pctCancel}% del total</div></div>`+
-    `<div class="stat-card"><div class="stat-card-lbl">Suspendidas</div><div class="stat-card-val" style="color:#9A3412">${suspendidas.length}</div><div class="stat-card-sub">${pctSusp}% del total</div></div>`;
+    '';
 
   function indCard(color, emoji, titulo, formula, valor, desc, barVal, extra=''){
     const p = Math.max(0, Math.min(barVal??0, 100));
@@ -2064,10 +2106,10 @@ function renderConcentrado(){
         : 'Registra la hora real de inicio para calcular este indicador',
       pctPuntual??0
     )+
-    indCard('var(--rojo2)', '🚫', 'Cancelación y Suspensión',
-      '(canceladas / programadas) × 100 · (suspendidas / programadas) × 100',
-      `${pctCancel}% · ${pctSusp}%`,
-      `${canceladas.length} canceladas y ${suspendidas.length} suspendidas de ${programadas} programadas`,
+    indCard('var(--rojo2)', '🚫', 'Cancelación de Cirugías',
+      '(canceladas / programadas) × 100',
+      `${pctCancel}%`,
+      `${canceladas.length} canceladas de ${programadas} programadas`,
       pctCancel+pctSusp,
       topMotivos.length ? `<div style="font-size:11px;font-weight:600;margin-top:8px">Motivos principales:</div>`+lista(topMotivos, ([m,n])=>`<div>· ${m}: <b>${n}</b></div>`) : ''
     )+
@@ -2147,7 +2189,7 @@ function renderConcentrado(){
     (topEsp.length||sinEsp
       ? `<div class="ind-card" style="grid-column:1/-1">
           <div class="ind-hdr"><div class="ind-dot" style="background:var(--az2)"></div><span class="ind-ttl">Especialidad más frecuente</span></div>
-          <div style="font-size:11px;color:var(--gris4);margin:2px 0 6px">Base: ${nAct} cirugías no canceladas/suspendidas · una especialidad suma a todos sus cirujanos, por eso puede no coincidir con el cirujano más frecuente</div>
+          <div style="font-size:11px;color:var(--gris4);margin:2px 0 6px">Base: ${nAct} cirugías no canceladas · una especialidad suma a todos sus cirujanos, por eso puede no coincidir con el cirujano más frecuente</div>
           ${sinEsp?`<div style="font-size:12px;color:var(--rojo2);margin-bottom:6px">⚠ ${sinEsp} cirugía${sinEsp!==1?'s':''} sin especialidad registrada (${Math.round(sinEsp/nAct*100)}%) — no se cuentan en ninguna especialidad</div>`:''}
           <div style="display:flex;gap:16px;flex-wrap:wrap;margin-top:8px">
             ${topEsp.slice(0,6).map(([e,n],i)=>`
@@ -2163,7 +2205,7 @@ function renderConcentrado(){
     (topCir.length
       ? `<div class="ind-card" style="grid-column:1/-1">
           <div class="ind-hdr"><div class="ind-dot" style="background:var(--verde2)"></div><span class="ind-ttl">Cirujano más frecuente</span></div>
-          <div style="font-size:11px;color:var(--gris4);margin:2px 0 6px">Base: ${nAct} cirugías no canceladas/suspendidas · debajo de cada nombre, la especialidad con la que se registraron sus cirugías</div>
+          <div style="font-size:11px;color:var(--gris4);margin:2px 0 6px">Base: ${nAct} cirugías no canceladas · debajo de cada nombre, la especialidad con la que se registraron sus cirugías</div>
           ${sinCir?`<div style="font-size:12px;color:var(--rojo2);margin-bottom:6px">⚠ ${sinCir} cirugía${sinCir!==1?'s':''} sin cirujano registrado</div>`:''}
           <div style="display:flex;gap:16px;flex-wrap:wrap;margin-top:8px">
             ${topCir.slice(0,6).map(([c,n],i)=>`
@@ -2180,6 +2222,11 @@ function renderConcentrado(){
 
 document.getElementById('prevDay').onclick=()=>{cur.setDate(cur.getDate()-1);render()};
 document.addEventListener('keydown',e=>{ if(e.key==='Escape') toggleCal(false); });
+document.addEventListener('click',e=>{
+  const p=document.getElementById('calPanel');
+  // (si el elemento ya no está en la página es porque el calendario se redibujó al cambiar de mes)
+  if(p&&p.classList.contains('vis')&&e.target.isConnected&&!e.target.closest('.cal-wrap')) toggleCal(false);
+});
 document.getElementById('nextDay').onclick=()=>{cur.setDate(cur.getDate()+1);render()};
 document.getElementById('btnNueva').onclick=()=>{
   requirePin(()=>{
@@ -2219,15 +2266,15 @@ function renderCal(){
     const intens = act.length ? Math.min(0.08+act.length*0.06,0.45) : 0;
     html+=`<div class="cal-day${d.getMonth()!==m?' otro':''}${k===hoyK?' hoy':''}${k===selK?' sel':''}" style="${intens?`background:rgba(37,99,168,${intens})`:''}" onclick="seleccionarDia('${k}')" title="${act.length} cirugía${act.length!==1?'s':''}${canc?' · '+canc+' cancelada/suspendida':''}${act.length?' · '+porSala:''}${pc?' · '+pc+' por cerrar':''}">
       <span class="n">${d.getDate()}</span>
-      ${act.length?`<span class="c">${act.length} cx</span>`:''}
-      ${canc?`<span class="x">${canc} canc.</span>`:''}
+      ${act.length?`<span class="c">${act.length}</span>`:''}
+      ${canc?`<span class="x">✕${canc}</span>`:''}
       ${pc?'<span class="pc">📝</span>':''}
     </div>`;
   }
   html+='</div>';
   html+=`<div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:6px;margin-top:8px;font-size:11px;color:var(--gris5)">
-    <span><b>${totMes}</b> cirugías en el mes${cancMes?' · '+cancMes+' canceladas/suspendidas':''}</span>
-    <span>📝 pendientes de cierre · azul más intenso = más cirugías · toca un día para abrirlo</span></div>`;
+    <span><b>${totMes}</b> cirugías en el mes${cancMes?' · '+cancMes+' canceladas':''}</span>
+    <span>número = cirugías · ✕ = canceladas · 📝 = por cerrar</span></div>`;
   p.innerHTML=html;
 }
 
@@ -2294,7 +2341,7 @@ function tablaResumen(filas, campo, total){
   BUS_FILAS[campo]=filas.map(([k])=>k.startsWith('⚠')?(campo==='especialidad'?'__sin':''):k);
   if(!filas.length) return '<div class="empty" style="padding:20px"><p>Sin resultados</p></div>';
   const sel=document.getElementById(campo==='cirujano'?'b-med':'b-esp').value;
-  return `<table><thead><tr><th>${campo==='cirujano'?'Médico':'Especialidad'}</th><th style="text-align:center">Total</th><th style="text-align:center">Realiz.</th><th style="text-align:center">Pend.</th><th style="text-align:center">Canc./Susp.</th><th>${campo==='cirujano'?'Especialidades':'Médicos'}</th></tr></thead><tbody>`+
+  return `<table><thead><tr><th>${campo==='cirujano'?'Médico':'Especialidad'}</th><th style="text-align:center">Total</th><th style="text-align:center">Realiz.</th><th style="text-align:center">Pend.</th><th style="text-align:center">Canc.</th><th>${campo==='cirujano'?'Especialidades':'Médicos'}</th></tr></thead><tbody>`+
     filas.map(([k,x],i)=>{
       const sinDato=k.startsWith('⚠');
       const val=BUS_FILAS[campo][i];
@@ -2323,7 +2370,7 @@ function renderBuscador(){
     `<div class="stat-card"><div class="stat-card-lbl">Cirugías encontradas</div><div class="stat-card-val c-az">${n}</div><div class="stat-card-sub">${nMed} médico${nMed!==1?'s':''}</div></div>`+
     `<div class="stat-card"><div class="stat-card-lbl">Realizadas</div><div class="stat-card-val c-verde">${real}</div><div class="stat-card-sub">${n?Math.round(real/n*100):0}%</div></div>`+
     `<div class="stat-card"><div class="stat-card-lbl">Pendientes / en curso</div><div class="stat-card-val c-amarillo">${pend}</div><div class="stat-card-sub">${n?Math.round(pend/n*100):0}%</div></div>`+
-    `<div class="stat-card"><div class="stat-card-lbl">Canceladas / suspendidas</div><div class="stat-card-val c-rojo">${canc}</div><div class="stat-card-sub">${n?Math.round(canc/n*100):0}%</div></div>`;
+    `<div class="stat-card"><div class="stat-card-lbl">Canceladas</div><div class="stat-card-val c-rojo">${canc}</div><div class="stat-card-sub">${n?Math.round(canc/n*100):0}%</div></div>`;
   // Cada resumen ignora su propio filtro para que se vea el comparativo completo
   const rm=filtrarBus(true,false), re=filtrarBus(false,true);
   document.getElementById('bus-med').innerHTML=tablaResumen(resumenPor(rm,'cirujano'),'cirujano',rm.length||1);
@@ -2359,7 +2406,7 @@ function exportarBusqueda(){
   const cols=[['fecha','Fecha'],['hora','Hora'],['qx','Quirófano'],['paciente','Paciente'],['expediente','Expediente'],['tipo','Procedimiento'],['especialidad','Especialidad'],['cirujano','Cirujano'],['anestesiologo','Anestesiólogo'],['tipoQx','Tipo de cirugía'],['estado','Estatus'],['duracionReal','Duración real (min)'],['cirugiaSegura','Cirugía segura'],['eventoAdverso','Evento adverso'],['motivo','Motivo cancelación']];
   const q=v=>`"${String(v??'').replace(/"/g,'""')}"`;
   const resumen=resumenPor(recs,'cirujano').map(([k,x])=>[k,x.n,x.real,x.pend,x.canc].map(q).join(','));
-  const csv=[cols.map(c=>q(c[1])).join(','), ...recs.map(r=>cols.map(c=>q(r[c[0]])).join(',')), '', q('Resumen por médico'), ['Médico','Total','Realizadas','Pendientes','Canceladas/Suspendidas'].map(q).join(','), ...resumen].join('\n');
+  const csv=[cols.map(c=>q(c[1])).join(','), ...recs.map(r=>cols.map(c=>q(r[c[0]])).join(',')), '', q('Resumen por médico'), ['Médico','Total','Realizadas','Pendientes','Canceladas'].map(q).join(','), ...resumen].join('\n');
   const a=document.createElement('a');
   a.href='data:text/csv;charset=utf-8,﻿'+encodeURIComponent(csv);
   a.download=`busqueda_qx_${dk(new Date())}.csv`; a.click(); toast('Resultados exportados');
