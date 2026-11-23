@@ -57,6 +57,7 @@ input:focus,select:focus{border-color:var(--az2);box-shadow:0 0 0 3px rgba(37,99
 .b-en-curso{background:var(--az3);color:var(--az)}
 .b-completada,.b-realizada{background:var(--verde3);color:var(--verde)}
 .b-cancelada{background:var(--gris1);color:var(--gris5)}
+.b-reprogramada{background:#EDE9FE;color:#6D28D9}
 .b-suspendida{background:#FFEDD5;color:#9A3412}
 .b-fallecimiento{background:#E5E7EB;color:#111827}
 .b-programada{background:var(--az3);color:var(--az)}
@@ -96,6 +97,7 @@ input:focus,select:focus{border-color:var(--az2);box-shadow:0 0 0 3px rgba(37,99
 .sl.en-curso{background:var(--az3);border-color:var(--az2);color:#1E3A5F}
 .sl.completada{background:var(--verde3);border-color:var(--verde2);color:#14532D}
 .sl.cancelada{background:var(--gris1);border-color:var(--gris3);color:var(--gris5)}
+.sl.reprogramada{background:#F5F3FF;border-color:#C4B5FD;border-style:dashed;color:#6D28D9;opacity:.85}
 .sl.conflict{outline:2px solid var(--rojo2);outline-offset:-1px}
 .sl-name{font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .sl-info{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;opacity:.8;font-size:10px}
@@ -120,6 +122,7 @@ input:focus,select:focus{border-color:var(--az2);box-shadow:0 0 0 3px rgba(37,99
 .sbtn.en-curso{background:var(--az3);color:#1E3A5F;border-color:var(--az2)}
 .sbtn.completada{background:var(--verde3);color:#14532D;border-color:var(--verde2)}
 .sbtn.cancelada{background:var(--gris1);color:var(--gris5);border-color:var(--gris3)}
+.sbtn.reprogramar{background:#F5F3FF;color:#6D28D9;border-color:#A78BFA}
 .sbtn.suspendida{background:#FFEDD5;color:#9A3412;border-color:#FB923C}
 .sbtn.fallecimiento{background:#E5E7EB;color:#111827;border-color:#6B7280}
 .sbtn.active-s{font-weight:700;box-shadow:0 0 0 2px currentColor}
@@ -410,7 +413,7 @@ style="background:var(--gris1);color:var(--gris5);cursor:default">
 <option value="">Todos los Qx</option><option>Quirófano 1</option><option>Quirófano 2</option><option>Quirófano 3</option>
 </select>
 <select id="fil-est" onchange="renderTabla()" style="width:120px">
-<option value="">Todos</option><option>Pendiente</option><option>En curso</option><option>Completada</option><option>Cancelada</option><option>Fallecimiento</option><option value="__cierre">📝 Por cerrar</option>
+<option value="">Todos</option><option>Pendiente</option><option>En curso</option><option>Completada</option><option>Cancelada</option><option>Reprogramada</option><option>Fallecimiento</option><option value="__cierre">📝 Por cerrar</option>
 </select>
 <input type="text" id="fil-buscar" placeholder="🔍 Expediente o paciente…" oninput="renderTabla()" style="flex:1;min-width:160px">
 <button class="btn btn-ghost btn-sm" onclick="limpFiltros()">✕</button>
@@ -443,7 +446,7 @@ style="background:var(--gris1);color:var(--gris5);cursor:default">
 <div style="grid-column:span 2"><label>Texto libre</label><input id="b-texto" placeholder="🔍 Paciente, expediente, procedimiento, médico…" oninput="renderBuscador()"></div>
 <div><label>Especialidad</label><select id="b-esp" onchange="renderBuscador()"></select></div>
 <div><label>Cirujano</label><select id="b-med" onchange="renderBuscador()"></select></div>
-<div><label>Estatus</label><select id="b-est" onchange="renderBuscador()"><option value="">Todos</option><option>Pendiente</option><option>En curso</option><option>Completada</option><option>Cancelada</option><option>Fallecimiento</option><option value="__real">Realizadas (Completada + Fallecimiento)</option></select></div>
+<div><label>Estatus</label><select id="b-est" onchange="renderBuscador()"><option value="">Todos</option><option>Pendiente</option><option>En curso</option><option>Completada</option><option>Cancelada</option><option>Reprogramada</option><option>Fallecimiento</option><option value="__real">Realizadas (Completada + Fallecimiento)</option></select></div>
 <div><label>Desde</label><input type="date" id="b-desde" onchange="marcarRango('');renderBuscador()"></div>
 <div><label>Hasta</label><input type="date" id="b-hasta" onchange="marcarRango('');renderBuscador()"></div>
 </div>
@@ -612,7 +615,7 @@ function normCS(v){
 }
 function normEstado(v){
   const t=(v==null?'':String(v)).trim().toLowerCase();
-  const m={'pendiente':'Pendiente','en curso':'En curso','en-curso':'En curso','completada':'Completada','realizada':'Completada','cancelada':'Cancelada','suspendida':'Cancelada','__x':'Suspendida','fallecimiento':'Fallecimiento'};
+  const m={'pendiente':'Pendiente','en curso':'En curso','en-curso':'En curso','completada':'Completada','realizada':'Completada','cancelada':'Cancelada','suspendida':'Cancelada','reprogramada':'Reprogramada','fallecimiento':'Fallecimiento'};
   return m[t]||String(v||'').trim();
 }
 function normEsp(v){
@@ -625,7 +628,10 @@ function normEsp(v){
   // Desconocida: se conserva con formato de título
   return t.charAt(0).toUpperCase()+t.slice(1);
 }
-function esCancelOSusp(r){ const e=normEstado(r.estado); return e==='Cancelada'||e==='Suspendida'; }
+// Cirugía que NO ocupa sala ese día (cancelada o reprogramada a otra fecha)
+function esCancelOSusp(r){ const e=normEstado(r.estado); return e==='Cancelada'||e==='Suspendida'||e==='Reprogramada'; }
+const esCancelada    = r => normEstado(r.estado)==='Cancelada';
+const esReprogramada = r => normEstado(r.estado)==='Reprogramada';
 // Duración entre dos horas; admite cirugías que cruzan la medianoche (hasta 12 h)
 function durMin(ini,fin){
   if(!ini||!fin) return null;
@@ -647,9 +653,19 @@ const CAMPOS_CIERRE = [
   ['anestesiologo','Anestesiólogo'],['instrumentista','Instrumentista'],
   ['cirugiaSegura','Hoja de Cirugía Segura'],['eventoAdverso','Evento adverso'],['piezaPat','Pieza patológica']
 ];
+// Nombre provisional cuando aún no se conoce el paciente ("NPD", "por definir", "sin nombre"…)
+function nombreProvisional(n){
+  const t=sinAcentos(String(n||'')).toLowerCase().replace(/[^a-z ]/g,' ').replace(/\s+/g,' ').trim();
+  if(!t) return true;
+  return /^(npd|n p d|nd|n d|na|n a|pd|x+|xx+|sin nombre|sn|s n|por definir|nombre por definir|pendiente|desconocido|no proporcionado|no disponible|se desconoce|paciente|pte)$/.test(t)
+      || /^npd\b/.test(t);
+}
+// Clave para comparar pacientes por nombre (vacía si es provisional)
+const claveNombre = n => nombreProvisional(n) ? '' : sinAcentos(String(n||'')).toLowerCase().replace(/\s+/g,' ').trim();
 function faltaCierre(r){
   if(!esRealizada(r)) return [];
   const f=CAMPOS_CIERRE.filter(([k])=>!String(r[k]??'').trim()).map(([,l])=>l);
+  if(String(r.paciente||'').trim() && nombreProvisional(r.paciente)) f.push('Nombre real del paciente (está como "'+String(r.paciente).trim()+'")');
   if(r.eventoAdverso==='Sí'&&!String(r.eventoAdversoDesc||'').trim()) f.push('Descripción del evento adverso');
   if(r.piezaPat==='Sí'&&!r.piezaDestino) f.push('Destino de la pieza');
   if(r.horaReal&&r.horaFin&&!durMin(r.horaReal,r.horaFin)) f.push('Horas reales inválidas (fin antes que inicio)');
@@ -712,7 +728,7 @@ function verReintervencion(id, desdeLista=true){
   const historial=DB.filter(o=>o.expediente&&o.expediente===r.expediente).sort((a,b)=>msFecha(a)-msFecha(b)||pH(a.hora)-pH(b.hora));
   const dias = ant ? Math.round((msFecha(r)-msFecha(ant))/86400000) : null;
   const mismoCir = ant && ant.cirujano && ant.cirujano===r.cirujano;
-  const nombreDistinto = ant && (ant.paciente||'').trim().toLowerCase()!==(r.paciente||'').trim().toLowerCase();
+  const nombreDistinto = ant && claveNombre(ant.paciente) && claveNombre(r.paciente) && claveNombre(ant.paciente)!==claveNombre(r.paciente);
   document.getElementById('modalContent').innerHTML=
     `<div class="modal-title">🟣 ${r.paciente||'Sin nombre'}<button class="modal-close" onclick="closeModal()">×</button></div>`+
     `<div style="font-size:12px;color:var(--gris5);margin-bottom:10px">Expediente <b style="font-family:'DM Mono',monospace">${r.expediente}</b> · `+
@@ -985,6 +1001,135 @@ async function convertirSuspendidas(){
   toast(fallas?`⚠ ${ok} cambiadas · ${fallas} quedaron en cola por falta de conexión y se enviarán solas`:`✓ ${ok} cirugías cambiadas a Cancelada`, fallas?'error':'success');
   render(); if(document.getElementById('page-base').classList.contains('active')) renderTabla();
 }
+// ════════ REPROGRAMACIÓN ════════
+// La cirugía original queda con estatus "Reprogramada" (no cuenta como cancelada)
+// y se crea —o se vincula— la programación en la nueva fecha.
+const MOTIVOS_REPROG = ['Paciente no apto / no preparado','Falta de insumos o material','Falta de autorización de aseguradora','Decisión o agenda del cirujano','Falta de sala o de tiempo quirúrgico','Solicitud del paciente / familiar','Falta de estudios preoperatorios','Falta de sangre / hemoderivados'];
+let LISTA_CANC=[], LISTA_REPROG=[];
+const porId = id => DB.find(x=>String(x.id)===String(id));
+function motivosDe(arr){
+  const m={}; arr.forEach(r=>{ const t=(r.motivo||'').trim()||'Sin motivo registrado'; const k=t.charAt(0).toUpperCase()+t.slice(1); m[k]=(m[k]||0)+1; });
+  return Object.entries(m).sort((a,b)=>b[1]-a[1]).slice(0,5);
+}
+function diasEntre(a,b){ return Math.round((new Date(b+'T12:00')-new Date(a+'T12:00'))/86400000); }
+// La reprogramación solo DEJA REGISTRO en la cirugía original (estatus, nueva fecha,
+// motivo y quién). No se vincula con ninguna otra programación: la nueva fecha se
+// captura como una cirugía normal (la app ofrece abrir el formulario ya prellenado).
+function promDiferimiento(arr){
+  const d=arr.filter(r=>r.fechaReprogramada).map(r=>diasEntre(fechaDe(r), r.fechaReprogramada));
+  return d.length ? Math.round(d.reduce((a,b)=>a+b,0)/d.length*10)/10 : '—';
+}
+function avisoReprogramacion(sg){
+  if(!esReprogramada(sg)) return '';
+  return `<div style="background:#F5F3FF;border:1px solid #C4B5FD;border-radius:8px;padding:10px 12px;margin:8px 0 12px;font-size:12px;color:#5B21B6;line-height:1.5">
+    📅 <b>Reprogramada</b>${sg.fechaReprogramada?` para el <b>${fFmt(sg.fechaReprogramada)}</b> (${diasEntre(fechaDe(sg),sg.fechaReprogramada)} días después)`:' — sin nueva fecha definida'}
+    ${sg.motivo?`<br>Motivo: ${sg.motivo}`:''}${sg.personalCancel?` · Reprogramó: ${sg.personalCancel}`:''}
+    <br><a href="#" onclick="requirePin(()=>programarNuevaFecha('${sg.id}'));return false" style="color:#6D28D9;font-weight:600">+ Capturar la programación en la nueva fecha</a></div>`;
+}
+let RP_DESDE='detalle';
+function volverDeReprog(id){ if(RP_DESDE==='lista') abrirListaCanceladas(); else irACirugia(id); }
+function abrirReprogramar(id, desde='detalle'){
+  RP_DESDE=desde;
+  const sg=porId(id); if(!sg) return;
+  const f0=fechaDe(sg);
+  const motivoPre = String(sg.motivo||'').trim();
+  document.getElementById('modalContent').innerHTML=
+    `<div class="modal-title">📅 Reprogramar cirugía<button class="modal-close" onclick="volverDeReprog('${sg.id}')">×</button></div>`+
+    `<div style="background:var(--gris0);border:1px solid var(--gris2);border-radius:8px;padding:10px 12px;font-size:12px;margin-bottom:12px;line-height:1.6">
+      <b>${sg.paciente||'Sin nombre'}</b>${sg.expediente?` · Exp. ${sg.expediente}`:''}<br>${sg.tipo||'—'} · ${sg.cirujano||'—'}<br>
+      Programada: <b>${fFmt(f0)} · ${sg.hora||''} · ${sg.qx||''}</b> · estatus actual: ${normEstado(sg.estado)}</div>`+
+    `<div style="font-size:12px;color:var(--gris5);margin-bottom:10px">Esta cirugía quedará como <b style="color:#6D28D9">Reprogramada</b> (no cuenta como cancelada). La programación en la nueva fecha se captura por separado.</div>`+
+    `<div class="form-grid">
+      <div class="form-group"><label>Nueva fecha</label><input type="date" id="rp-fecha" value="${escAttr(sg.fechaReprogramada)}"></div>
+      <div class="form-group" style="justify-content:flex-end"><label style="font-size:11px;color:var(--gris4);text-transform:none">Déjala vacía si aún no se define</label></div>
+      <div class="form-group full"><label>Motivo de la reprogramación *</label>
+        <div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:6px">${MOTIVOS_REPROG.map(m=>`<button type="button" class="chip" onclick="document.getElementById('rp-motivo').value='${m}'">${m}</button>`).join('')}</div>
+        <input id="rp-motivo" value="${escAttr(motivoPre)}" placeholder="Escribe o elige un motivo"></div>
+      <div class="form-group full"><label>¿Quién reprograma?</label><input id="rp-quien" value="${escAttr(sg.personalCancel)}" placeholder="Nombre (opcional)"></div>
+      <div class="form-group full"><label style="display:flex;gap:6px;align-items:center;text-transform:none;font-size:12px"><input type="checkbox" id="rp-capturar" style="width:auto"> Al terminar, abrir el formulario para capturar la cirugía en la nueva fecha (con los mismos datos)</label></div>
+    </div>`+
+    `<div class="form-actions"><button class="btn btn-ghost" onclick="volverDeReprog('${sg.id}')">Cancelar</button><button class="btn btn-primary" style="background:#6D28D9" onclick="guardarReprogramacion('${sg.id}')">📅 Marcar como reprogramada</button></div>`;
+  document.getElementById('modalBg').style.display='flex';
+}
+async function guardarReprogramacion(id){
+  const sg=porId(id); if(!sg) return;
+  const motivo=document.getElementById('rp-motivo').value.trim();
+  const quien=document.getElementById('rp-quien').value.trim();
+  const fN=document.getElementById('rp-fecha').value;
+  const capturar=document.getElementById('rp-capturar').checked;
+  if(!motivo){ toast('Escribe o elige el motivo de la reprogramación','error'); return; }
+  if(fN && fN<=fechaDe(sg) && !confirm('La nueva fecha es igual o anterior a la fecha original. ¿Continuar?')) return;
+  Object.assign(sg,{estado:'Reprogramada', motivo, personalCancel:quien, fechaReprogramada:fN||''});
+  showLoader('📅 Guardando…');
+  const r1=await apiCall({action:'update', record:{...sg}});
+  hideLoader();
+  toast(r1&&r1.ok?`✓ Marcada como reprogramada${fN?' para el '+fFmt(fN):''}`:'⚠ Sin conexión: quedó guardado en este equipo y se enviará al volver el internet', r1&&r1.ok?'success':'error');
+  render();
+  if(document.getElementById('page-concentrado').classList.contains('active')) renderConcentrado();
+  if(document.getElementById('page-base').classList.contains('active')) renderTabla();
+  if(capturar){ programarNuevaFecha(sg.id); return; }
+  if(RP_DESDE==='lista'){ abrirListaCanceladas(); return; }
+  irACirugia(sg.id);
+}
+// Abre el formulario de registro prellenado con los datos de la cirugía (sin vincularlas)
+function programarNuevaFecha(id){
+  const sg=porId(id); if(!sg) return;
+  closeModal();
+  showPage('registro', document.querySelector('[onclick="showPage(\'registro\',this)"]'));
+  const set=(i,v)=>{ const el=document.getElementById(i); if(el&&v!=null&&v!=='') el.value=v; };
+  set('f-fecha', sg.fechaReprogramada||'');
+  set('f-sala', sg.qx); set('f-hora', sg.hora); set('f-duracion', sg.duracion);
+  set('f-tipo', sg.tipoQx); set('f-expediente', sg.expediente); set('f-paciente', sg.paciente);
+  set('f-procedimiento', sg.tipo); set('f-lateralidad', sg.lateralidad);
+  const esp=document.getElementById('f-especialidad'); if(esp){ esp.innerHTML=optsEspecialidad(sg.especialidad||''); }
+  if(typeof poblarSelectCirujano==='function') poblarSelectCirujano('f-cirujano', sg.cirujano||'');
+  set('f-anestesiologo', sg.anestesiologo); set('f-instrumentista', sg.instrumentista);
+  set('f-insumos', sg.insumos); set('f-proveedor', sg.proveedor);
+  set('f-estatus','Pendiente');
+  if(typeof toggleCancel==='function') toggleCancel();
+  if(typeof chkCfRegistro==='function') chkCfRegistro();
+  toast('Revisa fecha, hora y quirófano y guarda la nueva programación');
+  window.scrollTo(0,0);
+}
+
+// ════════ LISTADOS DEL CONCENTRADO ════════
+function tablaListado(ids, cols, titulo, nota){
+  const recs=ids.map(porId).filter(Boolean);
+  document.getElementById('modalContent').innerHTML=
+    `<div class="modal-title">${titulo}<button class="modal-close" onclick="closeModal()">×</button></div>`+
+    `<div style="font-size:12px;color:var(--gris5);margin-bottom:10px">${nota}</div>`+
+    `<div class="table-wrap" style="max-height:60vh;overflow:auto"><table><thead><tr>${cols.map(c=>`<th>${c[0]}</th>`).join('')}</tr></thead><tbody>`+
+    recs.map(r=>`<tr class="clic" onclick="irACirugia('${r.id}')">${cols.map(c=>`<td style="${c[2]||''}">${c[1](r)}</td>`).join('')}</tr>`).join('')+
+    `</tbody></table></div>`+
+    `<div class="form-actions"><button class="btn btn-ghost" onclick="closeModal()">Cerrar</button></div>`;
+  document.getElementById('modalBg').style.display='flex';
+}
+function abrirListaCanceladas(){
+  tablaListado(LISTA_CANC, [
+    ['Fecha', r=>fFmt(fechaDe(r)), 'font-family:DM Mono,monospace;font-size:11px;white-space:nowrap'],
+    ['Hora / Qx', r=>`${r.hora||'—'} · ${(r.qx||'').replace('Quirófano ','Q')}`, 'font-size:11px;white-space:nowrap'],
+    ['Paciente', r=>`${r.paciente||'—'}${r.expediente?`<div style="font-size:10px;color:var(--gris4)">Exp. ${r.expediente}</div>`:''}`],
+    ['Procedimiento', r=>r.tipo||'—', 'max-width:180px'],
+    ['Cirujano', r=>r.cirujano||'—'],
+    ['Motivo', r=>r.motivo?r.motivo:'<span style="color:var(--rojo2)">Sin motivo</span>', 'max-width:200px'],
+    ['Canceló', r=>r.personalCancel||'—', 'font-size:11px;color:var(--gris5)'],
+    ['', r=>`<button class="btn btn-ghost btn-sm" style="color:#6D28D9;white-space:nowrap" onclick="event.stopPropagation();requirePin(()=>abrirReprogramar('${r.id}','lista'))">📅 Reprogramar</button>`]
+  ], `🚫 Cirugías canceladas — ${document.getElementById('con-mes').selectedOptions[0].text} ${document.getElementById('con-anio').value}`,
+  `${LISTA_CANC.length} cirugía${LISTA_CANC.length!==1?'s':''}. Toca un renglón para abrir la cirugía. Si en realidad se movió a otra fecha, usa <b>📅 Reprogramar</b>: dejará de contar como cancelada.`);
+}
+function abrirListaReprogramadas(){
+  tablaListado(LISTA_REPROG, [
+    ['Fecha original', r=>`${fFmt(fechaDe(r))}<div style="font-size:10px;color:var(--gris4)">${r.hora||''} · ${(r.qx||'').replace('Quirófano ','Q')}</div>`, 'white-space:nowrap;font-size:11px'],
+    ['Nueva fecha', r=>r.fechaReprogramada?`<b>${fFmt(r.fechaReprogramada)}</b>`:'<span style="color:var(--gris4)">Por definir</span>', 'white-space:nowrap;font-size:11px'],
+    ['Días', r=>r.fechaReprogramada?diasEntre(fechaDe(r),r.fechaReprogramada):'—', 'text-align:center;font-weight:600;color:#6D28D9'],
+    ['Paciente', r=>`${r.paciente||'—'}${r.expediente?`<div style="font-size:10px;color:var(--gris4)">Exp. ${r.expediente}</div>`:''}`],
+    ['Procedimiento', r=>r.tipo||'—', 'max-width:170px'],
+    ['Cirujano', r=>r.cirujano||'—'],
+    ['Motivo', r=>r.motivo||'<span style="color:var(--rojo2)">Sin motivo</span>', 'max-width:200px']
+  ], `📅 Cirugías reprogramadas — ${document.getElementById('con-mes').selectedOptions[0].text} ${document.getElementById('con-anio').value}`,
+  `${LISTA_REPROG.length} cirugía${LISTA_REPROG.length!==1?'s':''} programada${LISTA_REPROG.length!==1?'s':''} en este mes que se movieron a otra fecha. Toca un renglón para abrir la cirugía.`);
+}
+
 function mostrarAvisoOffline(){
   let el=document.getElementById('offlineBar');
   if(!MODO_OFFLINE){ if(el) el.remove(); return; }
@@ -1094,7 +1239,7 @@ function toast(msg,tipo='success'){
 function closeModal(){ document.getElementById('modalBg').style.display='none'; }
 
 function dC(s){
-  const cf=new Set(), ac=s.filter(x=>x.estado!=='cancelada'&&x.estado!=='Cancelada');
+  const cf=new Set(), ac=s.filter(x=>!esCancelOSusp(x));
   for(let i=0;i<ac.length;i++) for(let j=i+1;j<ac.length;j++){
     const a=ac[i],b=ac[j]; if(a.qx!==b.qx) continue;
     const aS=pH(a.hora),aE=aS+a.duracion,bS=pH(b.hora),bE=bS+b.duracion;
@@ -1103,14 +1248,14 @@ function dC(s){
   return cf;
 }
 function dCFor(s,eid,hora,dur,qx,est){
-  if(est==='cancelada'||est==='Cancelada') return [];
+  if(['cancelada','Cancelada','Reprogramada'].includes(est)) return [];
   const sT=pH(hora),eT=sT+dur;
-  return s.filter(o=>String(o.id)!==String(eid)&&o.qx===qx&&o.estado!=='cancelada'&&o.estado!=='Cancelada'&&sT<pH(o.hora)+o.duracion&&pH(o.hora)<eT);
+  return s.filter(o=>String(o.id)!==String(eid)&&o.qx===qx&&!esCancelOSusp(o)&&sT<pH(o.hora)+o.duracion&&pH(o.hora)<eT);
 }
 
 function badgeEst(e){
   const m={pendiente:'pendiente','en-curso':'en-curso',completada:'completada',cancelada:'cancelada',suspendida:'suspendida',
-    'Pendiente':'pendiente','En curso':'en-curso','Completada':'completada','Cancelada':'cancelada','Suspendida':'suspendida',
+    'Pendiente':'pendiente','En curso':'en-curso','Completada':'completada','Cancelada':'cancelada','Suspendida':'suspendida','Reprogramada':'reprogramada',
     Realizada:'realizada',Programada:'programada',Confirmada:'confirmada'};
   const cl=m[e]||'programada';
   return `<span class="badge b-${cl}">${e||'—'}</span>`;
@@ -1168,7 +1313,7 @@ async function confirmarInsumos(id){
 
 function rBanner(s,cf){
   const el=document.getElementById('alertBanner');
-  const ac=s.filter(x=>x.estado!=='cancelada'&&x.estado!=='Cancelada'),pairs=[],seen=new Set();
+  const ac=s.filter(x=>!esCancelOSusp(x)),pairs=[],seen=new Set();
   for(let i=0;i<ac.length;i++) for(let j=i+1;j<ac.length;j++){
     const a=ac[i],b=ac[j]; if(a.qx!==b.qx) continue;
     const aS=pH(a.hora),aE=aS+a.duracion,bS=pH(b.hora),bE=bS+b.duracion;
@@ -1182,7 +1327,7 @@ function rBanner(s,cf){
   // Banner insumos pendientes
   const insPend = s.filter(function(sg){
     return requiereConfirmacion(sg) && !sg.insumosConfirmado
-      && (sg.estado||'')!=='Cancelada' && (sg.estado||'')!=='cancelada'
+      && !esCancelOSusp(sg)
       && (sg.estado||'')!=='Suspendida';
   });
   if(insPend.length){
@@ -1198,7 +1343,7 @@ function rBanner(s,cf){
 }
 
 function rStats(s,cf){
-  const c={pendiente:0,'en-curso':0,completada:0,cancelada:0};
+  const c={pendiente:0,'en-curso':0,completada:0,cancelada:0,reprogramada:0};
   s.forEach(x=>{const k=(x.estado||'').toLowerCase().replace(' ','-');c[k]=(c[k]||0)+1});
   const nc=cf.size>0?Math.round(cf.size/2):0;
   document.getElementById('statsRow').innerHTML=
@@ -1207,6 +1352,7 @@ function rStats(s,cf){
     `<div class="stat"><div class="stat-lbl">En curso</div><div class="stat-val c-az">${c['en-curso']}</div></div>`+
     `<div class="stat"><div class="stat-lbl">Completadas</div><div class="stat-val c-verde">${c.completada}</div></div>`+
     `<div class="stat"><div class="stat-lbl">Canceladas</div><div class="stat-val c-rojo">${c.cancelada}</div></div>`+
+    (c.reprogramada?`<div class="stat"><div class="stat-lbl">Reprogramadas</div><div class="stat-val" style="color:#6D28D9">${c.reprogramada}</div></div>`:'')+
     `<div class="stat"><div class="stat-lbl">Traslapes</div><div class="stat-val c-rojo">${nc}</div></div>`+
     `<div class="stat"><div class="stat-lbl">Por cerrar</div><div class="stat-val c-amarillo">${s.filter(porCerrar).length}</div></div>`;
 }
@@ -1286,7 +1432,9 @@ function openDetail(id){
     (isc&&others.length?`<div class="conflict-warn">⚠ Traslape con: ${others.map(o=>nomPac(o)+' ('+o.hora+')').join(', ')}</div>`:'')+
     (isRein?`<div onclick="verReintervencion(${sg.id},false)" style="cursor:pointer;background:var(--morado3);border:1px solid #D8B4FE;border-radius:8px;padding:10px 12px;margin-bottom:12px;font-size:12px;color:var(--morado)">🔄 Reintervención detectada — expediente ${sg.expediente} tiene otra cirugía realizada en los 30 días previos (${reinDB.length} realizadas en total) · <b>Ver comparativo 🔍</b></div>`:'')+
     `<div style="margin-bottom:8px">${badgeEst(sg.estado)}</div>`+
-    `<div class="sbtns">${ESTADOS.map(e=>`<button class="sbtn ${e.toLowerCase().replace(' ','-')}${sg.estado===e?' active-s':''}" onclick="requirePin(()=>chSt(${id},'${e}'))">${e}</button>`).join('')}</div>`+
+    `<div class="sbtns">${ESTADOS.map(e=>`<button class="sbtn ${e.toLowerCase().replace(' ','-')}${sg.estado===e?' active-s':''}" onclick="requirePin(()=>chSt(${id},'${e}'))">${e}</button>`).join('')}`+
+      (esRealizada(sg)?'':`<button class="sbtn reprogramar${esReprogramada(sg)?' active-s':''}" onclick="requirePin(()=>abrirReprogramar('${sg.id}'))">📅 ${esReprogramada(sg)?'Reprogramada':'Reprogramar'}</button>`)+`</div>`+
+    avisoReprogramacion(sg)+
     `<div style="background:${sg.cirugiaSegura==='Completa'?'var(--verde3)':sg.cirugiaSegura?'#FEF9C3':'var(--rojo3)'};border:1.5px solid ${sg.cirugiaSegura==='Completa'?'var(--verde2)':sg.cirugiaSegura?'#F59E0B':'var(--rojo2)'};border-radius:10px;padding:10px 12px;margin:0 0 12px">
       <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;margin-bottom:6px">✅ Hoja de Cirugía Segura ${sg.cirugiaSegura?'— '+sg.cirugiaSegura:'— sin capturar'}</div>
       <div style="display:flex;gap:6px;flex-wrap:wrap">${OPC_CIR_SEGURA.map(o=>`<button class="sbtn ${o==='Completa'?'completada':o==='Incompleta'?'pendiente':'cancelada'}${sg.cirugiaSegura===o?' active-s':''}" onclick="requirePin(()=>setCampoRapido(${id},'cirugiaSegura','${o}'))">${o}</button>`).join('')}</div>
@@ -1460,7 +1608,7 @@ function openForm(sg, modoCierre=false){
     `<div class="form-grid" style="gap:10px;margin-bottom:10px">
       <div class="form-group"><label>Fecha</label><input type="date" id="efecha" value="${sg.fecha||sg._fecha||dk(cur)}" onchange="chkCf(${sg.id||0})"></div>
       <div class="form-group"><label>Quirófano</label><select id="eq" onchange="chkCf(${sg.id||0})">${QXS.map(q=>`<option${sg.qx===q?' selected':''}>${q}</option>`).join('')}</select></div>
-      <div class="form-group"><label>Estado</label><select id="ee" onchange="toggleMotivoModal()">${ESTADOS.map(e=>`<option value="${e}"${normEstado(sg.estado)===e?' selected':''}>${e}</option>`).join('')}</select></div>
+      <div class="form-group"><label>Estado</label><select id="ee" onchange="toggleMotivoModal()">${[...ESTADOS, ...(esReprogramada(sg)?['Reprogramada']:[])].map(e=>`<option value="${e}"${normEstado(sg.estado)===e?' selected':''}>${e}</option>`).join('')}</select></div>
       <div class="form-group"><label>Tipo de cirugía</label><select id="etipoqx"><option value="">— Selecciona —</option>${[...new Set([...TIPOS_QX, ...(sg.tipoQx&&!TIPOS_QX.includes(sg.tipoQx)?[sg.tipoQx]:[])])].map(t=>`<option value="${escAttr(t)}"${sg.tipoQx===t?' selected':''}>${t}</option>`).join('')}</select></div>
       <div class="form-group"><label>Hora programada</label><select id="eh" onchange="chkCf(${sg.id||0})">${hOpts}</select></div>
       <div class="form-group"><label>Duración estimada (min)</label><input id="ed" type="number" min="15" step="15" value="${sg.duracion||60}" oninput="chkCf(${sg.id||0})"></div>
@@ -1715,8 +1863,8 @@ function guardarCirugia(){
   const delDia=(diaDB[fNueva]||[]);
   const tras=dCFor(delDia,-1,hNueva,dNueva,qNueva,document.getElementById('f-estatus').value);
   if(tras.length && !confirm('⚠ Traslape en '+qNueva+' con: '+tras.map(o=>nomPac(o)+' ('+o.hora+')').join(', ')+'\n\n¿Guardar de todos modos?')) return;
-  const expN=document.getElementById('f-expediente').value.trim().toUpperCase(), pacN=document.getElementById('f-paciente').value.trim().toLowerCase();
-  const dup=delDia.find(o=>!esCancelOSusp(o)&&((expN&&o.expediente===expN)||(o.paciente||'').trim().toLowerCase()===pacN));
+  const expN=document.getElementById('f-expediente').value.trim().toUpperCase(), pacN=claveNombre(document.getElementById('f-paciente').value);
+  const dup=delDia.find(o=>!esCancelOSusp(o)&&((expN&&o.expediente===expN)||(pacN&&claveNombre(o.paciente)===pacN)));
   if(dup && !confirm('Ya existe una cirugía ese día para este paciente ('+dup.qx+' '+dup.hora+' — '+(dup.tipo||'')+').\n\n¿Registrar otra?')) return;
   const rec={
     id:nuevoId(),
@@ -1857,8 +2005,8 @@ function limpFiltros(){
 
 function exportarCSV(){
   if(!DB.length){toast('Sin datos para exportar','error');return}
-  const cols=['id','fecha','qx','hora','horaReal','horaFin','duracionReal','expediente','paciente','tipo','tipoQx','especialidad','lateralidad','cirujano','anestesiologo','instrumentista','duracion','estado','cirugiaSegura','eventoAdverso','eventoAdversoDesc','piezaPat','piezaDesc','piezaDestino','piezaPatologo','insumos','proveedor','personal','motivo','personalCancel','insumosConfirmado','insumosConfirmadoPor','insumosConfirmadoFecha'];
-  const hdrs=['ID','Fecha','Quirófano','Hora Prog.','Hora Real Inicio','Hora Real Fin','Duración Real (min)','N° Expediente','Paciente','Procedimiento','Tipo Cirugía','Especialidad','Lateralidad','Cirujano','Anestesiólogo','Instrumentista','Duración Est. (min)','Estatus','Hoja Cir. Segura','Evento Adverso','Desc. Evento Adverso','Pieza Patológica','Desc. Pieza','Destino Pieza','Patólogo / Lab.','Insumos','Proveedor','Personal','Motivo Cancelación','Personal Cancela','Insumos Confirmados','Confirmó Insumos','Fecha Confirmación'];
+  const cols=['id','fecha','qx','hora','horaReal','horaFin','duracionReal','expediente','paciente','tipo','tipoQx','especialidad','lateralidad','cirujano','anestesiologo','instrumentista','duracion','estado','cirugiaSegura','eventoAdverso','eventoAdversoDesc','piezaPat','piezaDesc','piezaDestino','piezaPatologo','insumos','proveedor','personal','motivo','personalCancel','insumosConfirmado','insumosConfirmadoPor','insumosConfirmadoFecha','fechaReprogramada'];
+  const hdrs=['ID','Fecha','Quirófano','Hora Prog.','Hora Real Inicio','Hora Real Fin','Duración Real (min)','N° Expediente','Paciente','Procedimiento','Tipo Cirugía','Especialidad','Lateralidad','Cirujano','Anestesiólogo','Instrumentista','Duración Est. (min)','Estatus','Hoja Cir. Segura','Evento Adverso','Desc. Evento Adverso','Pieza Patológica','Desc. Pieza','Destino Pieza','Patólogo / Lab.','Insumos','Proveedor','Personal','Motivo Cancelación','Personal Cancela','Insumos Confirmados','Confirmó Insumos','Fecha Confirmación','Nueva fecha (reprogramada)'];
   const csv=[hdrs.join(','),...DB.map(r=>cols.map(c=>`"${(r[c]??'').toString().replace(/"/g,'""')}"`).join(','))].join('\n');
   const a=document.createElement('a');
   a.href='data:text/csv;charset=utf-8,\uFEFF'+encodeURIComponent(csv);
@@ -1883,6 +2031,9 @@ function renderConcentrado(){
     if(d.getFullYear()===anio&&d.getMonth()===mes&&!allRecs.find(x=>String(x.id)===String(r.id))) allRecs.push(r);
   });
 
+  // Las reprogramadas se cuentan una sola vez: en la fecha en que finalmente quedaron
+  const reprogramadas = allRecs.filter(esReprogramada);
+  allRecs.splice(0, allRecs.length, ...allRecs.filter(r=>!esReprogramada(r)));
   const programadas = allRecs.length;
   const est = r => normEstado(r.estado);
   // "Realizadas" = la cirugía sí se llevó a cabo (Completada o Fallecimiento)
@@ -1942,6 +2093,8 @@ function renderConcentrado(){
 
   // ── 3. CANCELACIÓN Y SUSPENSIÓN ──────────────────────────────────────────
   const pctCancel = pct(canceladas.length, programadas) ?? 0;
+  LISTA_CANC = [...canceladas].sort((a,b)=>fechaDe(a).localeCompare(fechaDe(b))||(a.hora||'').localeCompare(b.hora||'')).map(r=>String(r.id));
+  LISTA_REPROG = [...reprogramadas].sort((a,b)=>fechaDe(a).localeCompare(fechaDe(b))||(a.hora||'').localeCompare(b.hora||'')).map(r=>String(r.id));
   const pctSusp   = pct(suspendidas.length, programadas) ?? 0;
   const motivos = {};
   [...canceladas,...suspendidas].forEach(r=>{ const m=(r.motivo||'').trim()||'Sin motivo registrado'; const k=m.charAt(0).toUpperCase()+m.slice(1).toLowerCase(); motivos[k]=(motivos[k]||0)+1; });
@@ -2053,6 +2206,7 @@ function renderConcentrado(){
     `<div class="stat-card"><div class="stat-card-lbl">Programadas en el mes</div><div class="stat-card-val c-az">${programadas}</div><div class="stat-card-sub">${promDiario} por día activo</div></div>`+
     `<div class="stat-card"><div class="stat-card-lbl">Realizadas</div><div class="stat-card-val c-verde">${nR}</div><div class="stat-card-sub">${programadas?Math.round(nR/programadas*100):0}% del total${allRecs.filter(vencida).length?` · ⚠ ${allRecs.filter(vencida).length} ya pasaron y siguen pendientes/en curso`:''}</div></div>`+
     `<div class="stat-card"><div class="stat-card-lbl">Canceladas</div><div class="stat-card-val c-rojo">${canceladas.length}</div><div class="stat-card-sub">${pctCancel}% del total</div></div>`+
+    `<div class="stat-card"><div class="stat-card-lbl">Reprogramadas</div><div class="stat-card-val" style="color:#6D28D9">${reprogramadas.length}</div><div class="stat-card-sub">movidas a otra fecha</div></div>`+
     '';
 
   function indCard(color, emoji, titulo, formula, valor, desc, barVal, extra=''){
@@ -2107,11 +2261,20 @@ function renderConcentrado(){
       pctPuntual??0
     )+
     indCard('var(--rojo2)', '🚫', 'Cancelación de Cirugías',
-      '(canceladas / programadas) × 100',
+      '(canceladas / programadas) × 100 · las reprogramadas no cuentan como canceladas',
       `${pctCancel}%`,
       `${canceladas.length} canceladas de ${programadas} programadas`,
       pctCancel+pctSusp,
-      topMotivos.length ? `<div style="font-size:11px;font-weight:600;margin-top:8px">Motivos principales:</div>`+lista(topMotivos, ([m,n])=>`<div>· ${m}: <b>${n}</b></div>`) : ''
+      (canceladas.length?`<div style="margin-top:8px"><button class="btn btn-ghost btn-sm" onclick="abrirListaCanceladas()">🔍 Ver cirugías canceladas (${canceladas.length})</button></div>`:'')+
+      (topMotivos.length ? `<div style="font-size:11px;font-weight:600;margin-top:8px">Motivos principales:</div>`+lista(topMotivos, ([m,n])=>`<div>· ${m}: <b>${n}</b></div>`) : '')
+    )+
+    indCard('#6D28D9', '📅', 'Reprogramación de Cirugías',
+      '(cirugías movidas a otra fecha / (programadas + reprogramadas)) × 100',
+      (pct(reprogramadas.length, programadas+reprogramadas.length)??0)+'%',
+      reprogramadas.length ? `${reprogramadas.length} cirugía${reprogramadas.length!==1?'s':''} programada${reprogramadas.length!==1?'s':''} en el mes se movi${reprogramadas.length!==1?'eron':'ó'} a otra fecha · diferimiento promedio: ${promDiferimiento(reprogramadas)} días` : 'Sin cirugías reprogramadas en el mes',
+      (pct(reprogramadas.length, programadas+reprogramadas.length)??0),
+      (reprogramadas.length?`<div style="margin-top:8px"><button class="btn btn-ghost btn-sm" onclick="abrirListaReprogramadas()">🔍 Ver cirugías reprogramadas (${reprogramadas.length})</button></div>`:'')+
+      (motivosDe(reprogramadas).length ? `<div style="font-size:11px;font-weight:600;margin-top:8px">Motivos principales:</div>`+lista(motivosDe(reprogramadas), ([m,n])=>`<div>· ${m}: <b>${n}</b></div>`) : '')
     )+
     indCard('var(--naranja2)', '🔄', 'Índice de Rotación de Sala',
       'minutos promedio entre el fin de una cirugía y el inicio real de la siguiente · misma sala · mismo día',
@@ -2260,21 +2423,21 @@ function renderCal(){
     const d=new Date(y,m,1-offset+i);
     if(i>=35 && d.getMonth()!==m) break;
     const k=dk(d), arr=diaDB[k]||[];
-    const act=arr.filter(r=>!esCancelOSusp(r)), canc=arr.length-act.length, pc=arr.filter(porCerrar).length;
+    const act=arr.filter(r=>!esCancelOSusp(r)), canc=arr.filter(esCancelada).length, rep=arr.filter(esReprogramada).length, pc=arr.filter(porCerrar).length;
     if(d.getMonth()===m){ totMes+=act.length; cancMes+=canc; }
     const porSala=QXS.map(q=>q.replace('Quirófano ','Q')+': '+act.filter(r=>r.qx===q).length).join(' · ');
     const intens = act.length ? Math.min(0.08+act.length*0.06,0.45) : 0;
     html+=`<div class="cal-day${d.getMonth()!==m?' otro':''}${k===hoyK?' hoy':''}${k===selK?' sel':''}" style="${intens?`background:rgba(37,99,168,${intens})`:''}" onclick="seleccionarDia('${k}')" title="${act.length} cirugía${act.length!==1?'s':''}${canc?' · '+canc+' cancelada/suspendida':''}${act.length?' · '+porSala:''}${pc?' · '+pc+' por cerrar':''}">
       <span class="n">${d.getDate()}</span>
       ${act.length?`<span class="c">${act.length}</span>`:''}
-      ${canc?`<span class="x">✕${canc}</span>`:''}
+      ${canc?`<span class="x">✕${canc}</span>`:''}${rep?`<span class="x" style="color:#6D28D9">↻${rep}</span>`:''}
       ${pc?'<span class="pc">📝</span>':''}
     </div>`;
   }
   html+='</div>';
   html+=`<div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:6px;margin-top:8px;font-size:11px;color:var(--gris5)">
     <span><b>${totMes}</b> cirugías en el mes${cancMes?' · '+cancMes+' canceladas':''}</span>
-    <span>número = cirugías · ✕ = canceladas · 📝 = por cerrar</span></div>`;
+    <span>número = cirugías · ✕ = canceladas · ↻ = reprogramadas · 📝 = por cerrar</span></div>`;
   p.innerHTML=html;
 }
 
@@ -2331,6 +2494,7 @@ function resumenPor(recs, campo){
     const x=g[k]=g[k]||{n:0,real:0,pend:0,canc:0,sub:{}};
     x.n++;
     if(esRealizada(r)) x.real++; else if(esCancelOSusp(r)) x.canc++; else x.pend++;
+    if(esReprogramada(r)) x.rep=(x.rep||0)+1;
     const sk=campo==='cirujano'?(r.especialidad||'Sin especialidad'):(r.cirujano||'Sin cirujano');
     x.sub[sk]=(x.sub[sk]||0)+1;
   });
@@ -2364,13 +2528,13 @@ function filtroRapido(campo, i){
 function renderBuscador(){
   if(!document.getElementById('bus-res')) return;
   const recs=filtrarBus();
-  const n=recs.length, real=recs.filter(esRealizada).length, canc=recs.filter(esCancelOSusp).length, pend=n-real-canc;
+  const n=recs.length, real=recs.filter(esRealizada).length, canc=recs.filter(esCancelada).length, nRep=recs.filter(esReprogramada).length, pend=n-real-canc-nRep;
   const nMed=new Set(recs.map(r=>r.cirujano).filter(Boolean)).size;
   document.getElementById('bus-stats').innerHTML=
     `<div class="stat-card"><div class="stat-card-lbl">Cirugías encontradas</div><div class="stat-card-val c-az">${n}</div><div class="stat-card-sub">${nMed} médico${nMed!==1?'s':''}</div></div>`+
     `<div class="stat-card"><div class="stat-card-lbl">Realizadas</div><div class="stat-card-val c-verde">${real}</div><div class="stat-card-sub">${n?Math.round(real/n*100):0}%</div></div>`+
     `<div class="stat-card"><div class="stat-card-lbl">Pendientes / en curso</div><div class="stat-card-val c-amarillo">${pend}</div><div class="stat-card-sub">${n?Math.round(pend/n*100):0}%</div></div>`+
-    `<div class="stat-card"><div class="stat-card-lbl">Canceladas</div><div class="stat-card-val c-rojo">${canc}</div><div class="stat-card-sub">${n?Math.round(canc/n*100):0}%</div></div>`;
+    `<div class="stat-card"><div class="stat-card-lbl">Canceladas</div><div class="stat-card-val c-rojo">${canc}</div><div class="stat-card-sub">${n?Math.round(canc/n*100):0}%${nRep?` · ${nRep} reprogramada${nRep!==1?'s':''}`:''}</div></div>`;
   // Cada resumen ignora su propio filtro para que se vea el comparativo completo
   const rm=filtrarBus(true,false), re=filtrarBus(false,true);
   document.getElementById('bus-med').innerHTML=tablaResumen(resumenPor(rm,'cirujano'),'cirujano',rm.length||1);
