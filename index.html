@@ -213,6 +213,11 @@ tbody tr:last-child{border-bottom:none}
 .chip.on{background:var(--az);color:#fff;border-color:var(--az)}
 tr.clic{cursor:pointer} tr.clic:hover td{background:var(--az3)}
 @media(max-width:700px){.cal-day{min-height:38px;padding:2px 3px}.cal-day .c{padding:0 3px}.bus-grid>div[style*="span 2"]{grid-column:auto!important}}
+.campo-falta{border-color:#F59E0B!important;background:#FFFBEB!important;box-shadow:0 0 0 2px rgba(245,158,11,.25)}
+.falta-link{display:inline-block;background:#fff;border:1px solid #F59E0B;border-radius:99px;padding:2px 9px;margin:3px 4px 0 0;cursor:pointer;font-size:11px;color:#78350F}
+.falta-link:hover{background:#FEF3C7}
+#tabla-body tr{cursor:pointer}
+#tabla-body tr:hover td{background:var(--az3)}
 </style>
 </head>
 <body>
@@ -402,6 +407,7 @@ style="background:var(--gris1);color:var(--gris5);cursor:default">
 <div class="page-hdr">
 <div><h1>Base de Datos</h1><p><span id="total-reg">0</span> registros totales</p></div>
 <div style="display:flex;gap:8px;flex-wrap:wrap">
+<button class="btn btn-sm" id="btnPorCerrar" onclick="filtrarPorCerrar()" style="background:#FEF3C7;color:#92400E;border:1px solid #F59E0B"></button>
 <button class="btn btn-sm" id="btnSuspCanc" style="display:none;background:#FEE2E2;color:#991B1B;border:1px solid #FCA5A5" onclick="requirePin(convertirSuspendidas)"></button>
 <button class="btn btn-primary btn-sm" onclick="exportarCSV()">↓ Exportar CSV</button>
 </div>
@@ -1581,7 +1587,8 @@ function openForm(sg, modoCierre=false){
   const durR = sg.duracionReal || '';
   document.getElementById('modalContent').innerHTML=
     `<div class="modal-title">${isN?'Nueva cirugía':'Editar cirugía'}<button class="modal-close" onclick="closeModal()">×</button></div>`+
-    (modoCierre&&falt.length?`<div style="background:#FEF3C7;border:1.5px solid #F59E0B;border-radius:10px;padding:10px 12px;margin-bottom:12px;font-size:12px;color:#78350F"><b>📝 Cierre de cirugía — faltan ${falt.length} dato${falt.length!==1?'s':''}:</b><br>${falt.join(' · ')}</div>`:'')+
+    (modoCierre&&falt.length?`<div style="background:#FEF3C7;border:1.5px solid #F59E0B;border-radius:10px;padding:10px 12px;margin-bottom:12px;font-size:12px;color:#78350F"><b>📝 Cierre de cirugía — faltan ${falt.length} dato${falt.length!==1?'s':''}</b> <span style="font-weight:400">(toca uno para ir al campo)</span>:<br>${falt.map(t=>{ const i=inputDeFalta(t); return i?`<span class="falta-link" onclick="irACampo('${i}')">${t}</span>`:`<span class="falta-link" style="cursor:default">${t}</span>`; }).join('')}</div>`:'')+
+    (modoCierre&&!falt.length&&vencida(sg)?`<div style="background:#FEF3C7;border:1.5px solid #F59E0B;border-radius:10px;padding:10px 12px;margin-bottom:12px;font-size:12px;color:#78350F"><b>📝 Esta cirugía ya debió terminar y sigue como ${normEstado(sg.estado)}.</b> Actualiza el estatus (Completada, Cancelada, Reprogramada…).</div>`:'')+
     `<div class="form-cw" id="ecw"></div>`+
     `<div style="font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--gris4);padding:10px 0 8px;border-bottom:1px solid var(--gris2);margin-bottom:10px">Indicadores de calidad — Hoja de Cirugía Segura</div>`+
     `<div class="form-grid" style="gap:10px;margin-bottom:10px">
@@ -1664,10 +1671,12 @@ function openForm(sg, modoCierre=false){
     `<div class="form-actions">
       ${sg.id?`<button class="btn-del" onclick="delSg(${sg.id})">🗑 Eliminar</button>`:''}
       <button class="btn btn-ghost" onclick="closeModal()">Cancelar</button>
-      <button class="btn btn-success" onclick="saveFrm(${sg.id||0})">✓ Guardar</button>
+      <button class="btn btn-success" onclick="SIGUIENTE_CIERRE=false;saveFrm(${sg.id||0})">✓ Guardar</button>
+      ${sg.id&&document.getElementById('page-base').classList.contains('active')&&siguienteCierre(sg.id)?`<button class="btn btn-primary" onclick="SIGUIENTE_CIERRE=true;saveFrm(${sg.id})" title="Guarda y abre la siguiente cirugía por cerrar de la lista">✓ Guardar y siguiente ›</button>`:''}
     </div>`;
   document.getElementById('modalBg').style.display='flex';
   poblarSelectCirujano('ec', sg.cirujano||'');
+  if(modoCierre){ setTimeout(()=>{ marcarFaltantes(sg); const pf=faltaCierre(sg).map(inputDeFalta).find(Boolean); if(pf) irACampo(pf); },60); }
   chkCf(sg.id||0);
 }
 
@@ -1773,6 +1782,11 @@ async function saveFrm(id){
   hideLoader(); closeModal(); render();
   if(document.getElementById('page-base').classList.contains('active')) renderTabla();
   if(document.getElementById('page-concentrado').classList.contains('active')) renderConcentrado();
+  if(SIGUIENTE_CIERRE){
+    SIGUIENTE_CIERRE=false;
+    const sig=siguienteCierre(id);
+    if(sig){ editarDesdeBD(sig); } else toast('✓ No quedan cirugías por cerrar en esta lista');
+  }
 }
 
 const hoy=dk(new Date());
@@ -1934,6 +1948,9 @@ function renderTabla(){
     (!fb||(r.expediente||'').toLowerCase().includes(fb)||(r.paciente||'').toLowerCase().includes(fb))
   ).sort((a,b)=>(a.fecha||a._fecha||'').localeCompare(b.fecha||b._fecha||'')||(a.hora||'').localeCompare(b.hora||''));
   document.getElementById('total-reg').textContent=DB.length;
+  const nPC=DB.filter(porCerrar).length, bPC=document.getElementById('btnPorCerrar');
+  if(bPC){ bPC.style.display=nPC||fe==='__cierre'?'':'none'; bPC.textContent = fe==='__cierre' ? '✕ Ver todas' : `📝 Por cerrar (${nPC})`; }
+  COLA_CIERRE = data.filter(porCerrar).map(r=>String(r.id));
   const tbody=document.getElementById('tabla-body');
   const empty=document.getElementById('tabla-empty');
   if(!data.length){tbody.innerHTML='';empty.style.display='block';return}
@@ -1945,7 +1962,7 @@ function renderTabla(){
     const durRealCell = r.duracionReal
       ? `<span class="dur-real-chip">✓ ${r.duracionReal} min</span>`
       : '—';
-    return `<tr>
+    return `<tr onclick="abrirCierreBD('${r.id}')" title="${porCerrar(r)?'Clic para completar los datos faltantes':'Clic para editar'}">
       <td style="font-family:'DM Mono',monospace;font-size:11px">${fechaFmt}</td>
       <td>${r.qx||r.sala||'—'}</td>
       <td style="font-family:'DM Mono',monospace;font-size:11px">${r.hora}</td>
@@ -1959,8 +1976,8 @@ function renderTabla(){
       <td style="font-family:'DM Mono',monospace;font-size:11px">${r.horaReal||'—'}</td>
       <td style="font-family:'DM Mono',monospace;font-size:11px">${r.horaFin||'—'}</td>
       <td style="text-align:center">${durRealCell}</td>
-      <td>${badgeEst(r.estado)}${porCerrar(r)?`<div title="${escAttr(vencida(r)?'Ya debió terminar':'Falta: '+faltaCierre(r).join(', '))}" style="font-size:10px;color:#B45309;margin-top:2px">📝 por cerrar</div>`:''}</td>
-      <td>${rein?`<span class="badge b-si" style="cursor:pointer" title="Ver cirugía anterior y actual" onclick="verReintervencion(${r.id},false)">Sí 🔍</span>`:'<span class="badge b-no">No</span>'}</td>
+      <td>${badgeEst(r.estado)}${porCerrar(r)?`<div title="${escAttr(vencida(r)?'Ya debió terminar':'Falta: '+faltaCierre(r).join(', '))}" style="font-size:10px;color:#B45309;margin-top:2px;font-weight:600">📝 por cerrar · ${vencida(r)&&!faltaCierre(r).length?'actualizar estatus':faltaCierre(r).length+' dato'+(faltaCierre(r).length!==1?'s':'')}</div>`:''}</td>
+      <td>${rein?`<span class="badge b-si" style="cursor:pointer" title="Ver cirugía anterior y actual" onclick="event.stopPropagation();verReintervencion(${r.id},false)">Sí 🔍</span>`:'<span class="badge b-no">No</span>'}</td>
       <td>${r.cirugiaSegura
         ? `<span class="badge ${r.cirugiaSegura==='Completa'?'b-completada':r.cirugiaSegura==='Incompleta'?'b-traslape':'b-cancelada'}">${r.cirugiaSegura}</span>`
         : '—'}</td>
@@ -1972,7 +1989,7 @@ function renderTabla(){
             ? '<span class="badge b-completada" title="'+( r.insumosConfirmadoPor||'')+' · '+(r.insumosConfirmadoFecha||'')+'">✅ Confirmado</span>'
             : '<span class="badge b-traslape">📦 Pendiente</span>')
         : '—'}</td>
-      <td style="white-space:nowrap"><button class="btn btn-ghost btn-sm" title="Editar" onclick="editarDesdeBD(${r.id})">✏</button><button class="btn btn-ghost btn-sm" style="color:var(--rojo2)" title="Eliminar" onclick="eliminarDB(${r.id})">✕</button></td>
+      <td style="white-space:nowrap" onclick="event.stopPropagation()"><button class="btn btn-ghost btn-sm" title="Editar" onclick="editarDesdeBD(${r.id})">✏</button><button class="btn btn-ghost btn-sm" style="color:var(--rojo2)" title="Eliminar" onclick="eliminarDB(${r.id})">✕</button></td>
     </tr>`;
   }).join('');
 }
@@ -1984,7 +2001,41 @@ function editarDesdeBD(id){
     cur=new Date(f+'T12:00:00'); cur.setHours(0,0,0,0);
     if(!diaDB[f]) diaDB[f]=[];
     if(!diaDB[f].some(x=>String(x.id)===String(id))) diaDB[f].push(r);
-    openForm(diaDB[f].find(x=>String(x.id)===String(id)));
+    const sg=diaDB[f].find(x=>String(x.id)===String(id));
+    openForm(sg, porCerrar(sg));
+  });
+}
+// ════════ CIERRE RÁPIDO DESDE BASE DE DATOS ════════
+let COLA_CIERRE=[], SIGUIENTE_CIERRE=false;
+function filtrarPorCerrar(){
+  const sel=document.getElementById('fil-est');
+  sel.value = sel.value==='__cierre' ? '' : '__cierre';
+  renderTabla();
+}
+function abrirCierreBD(id){ SIGUIENTE_CIERRE=false; editarDesdeBD(id); }
+function siguienteCierre(idActual){
+  const i=COLA_CIERRE.indexOf(String(idActual));
+  return COLA_CIERRE.slice(i+1).find(x=>{ const r=porId(x); return r&&porCerrar(r); }) || null;
+}
+// Lleva al campo faltante y lo marca
+const CAMPO_INPUT = {
+  'Hora real de inicio':'ehr','Hora real de fin':'ehf','Tipo de cirugía':'etipoqx','Especialidad':'eesp',
+  'Lateralidad':'elat','Cirujano':'ec','Anestesiólogo':'ea','Instrumentista':'ei',
+  'Hoja de Cirugía Segura':'ecirugiasegura','Evento adverso':'eeventoadverso','Pieza patológica':'epiezapat',
+  'Descripción del evento adverso':'eeventoadversodesc','Destino de la pieza':'epiezadestino',
+  'Horas reales inválidas (fin antes que inicio)':'ehf','No. de expediente':'eexp'
+};
+function inputDeFalta(txt){ if(/^Nombre real del paciente/.test(txt)) return 'ep'; return CAMPO_INPUT[txt]||null; }
+function irACampo(id){
+  const el=document.getElementById(id); if(!el) return;
+  el.scrollIntoView({behavior:'smooth',block:'center'}); setTimeout(()=>el.focus(),250);
+}
+function marcarFaltantes(sg){
+  faltaCierre(sg).forEach(t=>{
+    const id=inputDeFalta(t), el=id&&document.getElementById(id); if(!el) return;
+    el.classList.add('campo-falta');
+    const quitar=()=>{ if(String(el.value||'').trim()) el.classList.remove('campo-falta'); };
+    el.addEventListener('change',quitar); el.addEventListener('input',quitar);
   });
 }
 
