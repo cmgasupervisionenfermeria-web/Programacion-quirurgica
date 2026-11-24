@@ -407,6 +407,7 @@ style="background:var(--gris1);color:var(--gris5);cursor:default">
 <div class="page-hdr">
 <div><h1>Base de Datos</h1><p><span id="total-reg">0</span> registros totales</p></div>
 <div style="display:flex;gap:8px;flex-wrap:wrap">
+<button class="btn btn-sm" id="btnLote" onclick="requirePin(abrirLote)" style="display:none;background:#EDE9FE;color:#5B21B6;border:1px solid #C4B5FD">⚡ Completar junio 2026 en lote</button>
 <button class="btn btn-sm" id="btnPorCerrar" onclick="filtrarPorCerrar()" style="background:#FEF3C7;color:#92400E;border:1px solid #F59E0B"></button>
 <button class="btn btn-sm" id="btnSuspCanc" style="display:none;background:#FEE2E2;color:#991B1B;border:1px solid #FCA5A5" onclick="requirePin(convertirSuspendidas)"></button>
 <button class="btn btn-primary btn-sm" onclick="exportarCSV()">↓ Exportar CSV</button>
@@ -989,6 +990,102 @@ function ajustarFiltroSuspendida(){
   b.style.display = n ? '' : 'none';
   b.textContent = `🔁 Cambiar ${n} "Suspendida" a "Cancelada" en la hoja`;
 }
+// ════════ COMPLETAR DATOS EN LOTE ════════
+// Llena SOLO los campos vacíos de las cirugías realizadas por cerrar de un mes.
+// Nunca sobrescribe un dato ya capturado ni toca otros campos.
+const CAMPOS_LOTE = [
+  {k:'cirugiaSegura', l:'Hoja de Cirugía Segura', opts:['Completa','Incompleta','No aplica'], def:'Completa'},
+  {k:'tipoQx',        l:'Tipo de cirugía',        opts:['Programada','Programada espontánea','Urgente'], def:'Programada'},
+  {k:'instrumentista',l:'Instrumentista',         txt:true, def:'Sin datos'},
+  {k:'piezaPat',      l:'Pieza patológica',       opts:['No','Sí'], def:'No'},
+  {k:'eventoAdverso', l:'Evento adverso',         opts:['No','Sí'], def:''},
+  {k:'anestesiologo', l:'Anestesiólogo',          txt:true, def:''},
+  {k:'lateralidad',   l:'Lateralidad',            opts:['N/A','Derecha','Izquierda','Bilateral'], def:''},
+];
+// Herramienta de uso único: solo para las cirugías de junio 2026.
+// El botón se oculta solo cuando ya no quedan cirugías realizadas por cerrar en ese mes.
+const LOTE_MES=5, LOTE_ANIO=2026;
+function hayLotePendiente(){
+  const pref=`${LOTE_ANIO}-${String(LOTE_MES+1).padStart(2,'0')}-`;
+  return DB.some(r=>fechaDe(r).startsWith(pref) && esRealizada(r) && faltaCierre(r).length);
+}
+function actualizarBtnLote(){ const b=document.getElementById('btnLote'); if(b) b.style.display=hayLotePendiente()?'':'none'; }
+const MESES_ES=['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+function loteCandidatas(){
+  const m=+document.getElementById('lt-mes').value, y=+document.getElementById('lt-anio').value;
+  const pref=`${y}-${String(m+1).padStart(2,'0')}-`;
+  return DB.filter(r=>fechaDe(r).startsWith(pref) && esRealizada(r) && faltaCierre(r).length);
+}
+function loteValores(){
+  const v={}; CAMPOS_LOTE.forEach(c=>{ const el=document.getElementById('lt-'+c.k); const x=String(el.value||'').trim(); if(x) v[c.k]=x; }); return v;
+}
+function lotePreview(){
+  const cand=loteCandidatas(), val=loteValores();
+  const m=+document.getElementById('lt-mes').value, y=+document.getElementById('lt-anio').value;
+  const pref=`${y}-${String(m+1).padStart(2,'0')}-`;
+  const pendVenc=DB.filter(r=>fechaDe(r).startsWith(pref) && vencida(r)).length;
+  const porCampo=Object.keys(val).map(k=>[CAMPOS_LOTE.find(c=>c.k===k).l, cand.filter(r=>!String((RAW_DB[String(r.id)]||r)[k]??'').trim()).length]);
+  const afectadas=cand.filter(r=>Object.keys(val).some(k=>!String((RAW_DB[String(r.id)]||r)[k]??'').trim())).length;
+  document.getElementById('lt-prev').innerHTML=
+    `<b>${cand.length}</b> cirugía${cand.length!==1?'s':''} realizada${cand.length!==1?'s':''} por cerrar en ${MESES_ES[m]} ${y}. `+
+    (Object.keys(val).length?`Se llenarán en <b>${afectadas}</b>:<br>`+porCampo.map(([l,n])=>`· ${l}: ${n} vacío${n!==1?'s':''}`).join('<br>'):'Elige al menos un dato.')+
+    (pendVenc?`<div style="margin-top:6px;color:#92400E">⚠ ${pendVenc} cirugía${pendVenc!==1?'s':''} de ese mes ${pendVenc!==1?'siguen':'sigue'} como Pendiente/En curso: no se modifican; primero hay que actualizar su estatus.</div>`:'');
+  document.getElementById('lt-btn').disabled=!afectadas;
+}
+function abrirLote(){
+  const h=new Date(); const anios=[]; for(let y=2026;y<=h.getFullYear();y++) anios.push(y);
+  document.getElementById('modalContent').innerHTML=
+    `<div class="modal-title">⚡ Completar datos en lote<button class="modal-close" onclick="closeModal()">×</button></div>`+
+    `<div style="font-size:12px;color:var(--gris5);margin-bottom:12px;line-height:1.5">Llena de una vez los datos elegidos en todas las cirugías <b>realizadas</b> (Completada / Fallecimiento) que están <b>por cerrar</b> en el mes seleccionado. <b>Solo se llenan los campos que están vacíos</b>; lo que ya está capturado no se cambia. Deja en blanco lo que no quieras llenar.</div>`+
+    `<div class="form-grid">
+      <div class="form-group"><label>Mes</label><select id="lt-mes" disabled><option value="${LOTE_MES}" selected>${MESES_ES[LOTE_MES]}</option></select></div>
+      <div class="form-group"><label>Año</label><select id="lt-anio" disabled><option selected>${LOTE_ANIO}</option></select></div>
+      ${CAMPOS_LOTE.map(c=>`<div class="form-group"><label>${c.l}</label>${c.txt
+        ? `<input id="lt-${c.k}" value="${escAttr(c.def)}" placeholder="— no llenar —" oninput="lotePreview()">`
+        : `<select id="lt-${c.k}" onchange="lotePreview()"><option value="">— no llenar —</option>${c.opts.map(o=>`<option${o===c.def?' selected':''}>${o}</option>`).join('')}</select>`}</div>`).join('')}
+    </div>`+
+    `<div id="lt-prev" style="background:#F5F3FF;border:1px solid #C4B5FD;border-radius:8px;padding:10px 12px;font-size:12px;color:#4C1D95;margin-top:10px;line-height:1.6"></div>`+
+    `<div class="form-actions"><button class="btn btn-ghost" onclick="closeModal()">Cancelar</button><button class="btn btn-primary" id="lt-btn" style="background:#6D28D9" onclick="aplicarLote()">⚡ Aplicar</button></div>`;
+  document.getElementById('modalBg').style.display='flex';
+  lotePreview();
+}
+async function aplicarLote(){
+  const m=+document.getElementById('lt-mes').value, y=+document.getElementById('lt-anio').value;
+  const val=loteValores();
+  if(!Object.keys(val).length){ toast('Elige al menos un dato','error'); return; }
+  if(val.eventoAdverso==='Sí' && !confirm('Vas a marcar EVENTO ADVERSO = Sí en todas. ¿Seguro?')) return;
+  if(val.piezaPat==='Sí' && !confirm('Vas a marcar PIEZA PATOLÓGICA = Sí en todas. ¿Seguro?')) return;
+  closeModal();
+  await cargarDatos(); // datos frescos antes de escribir
+  // Reabrir selección con los datos nuevos
+  const pref=`${y}-${String(m+1).padStart(2,'0')}-`;
+  const cand=DB.filter(r=>fechaDe(r).startsWith(pref) && esRealizada(r) && faltaCierre(r).length);
+  const trabajo=cand.map(r=>{
+    const base=RAW_DB[String(r.id)]; if(!base) return null;
+    const cambios={}; Object.entries(val).forEach(([k,v])=>{ if(!String(base[k]??'').trim()) cambios[k]=v; });
+    return Object.keys(cambios).length ? {r, base, cambios} : null;
+  }).filter(Boolean);
+  if(!trabajo.length){ toast('No hay campos vacíos por llenar en ese mes ✓'); return; }
+  if(!confirm(`Se llenarán datos vacíos en ${trabajo.length} cirugía${trabajo.length!==1?'s':''} de ${MESES_ES[m]} ${y}.\n\n`+Object.entries(val).map(([k,v])=>'• '+CAMPOS_LOTE.find(c=>c.k===k).l+': '+v).join('\n')+`\n\nLos datos ya capturados no se modifican. ¿Continuar?`)) return;
+  let ok=0, cola=0;
+  for(let i=0;i<trabajo.length;i++){
+    const {r, base, cambios}=trabajo[i];
+    showLoader(`⚡ Completando… ${i+1} de ${trabajo.length}`);
+    const rec={...base, ...cambios};
+    let res=await apiCall({action:'update', record:rec});
+    if(!res||!res.ok){ await new Promise(x=>setTimeout(x,1200)); res=await apiCall({action:'update', record:rec}); }
+    Object.assign(r, cambios); Object.assign(base, cambios);
+    if(res&&res.ok) ok++; else cola++;
+  }
+  hideLoader();
+  toast(cola?`⚠ ${ok} guardadas · ${cola} en cola por conexión (se enviarán solas)`:`✓ ${ok} cirugías completadas`, cola?'error':'success');
+  render(); if(document.getElementById('page-base').classList.contains('active')) renderTabla();
+  if(document.getElementById('page-concentrado').classList.contains('active')) renderConcentrado();
+  actualizarBtnLote();
+  if(!hayLotePendiente()) toast('✓ Junio 2026 quedó sin cirugías por cerrar','success');
+  else toast('Aún quedan cirugías de junio por cerrar con otros datos faltantes (horas reales, anestesiólogo…). Complétalas con 📝 Por cerrar','error');
+}
+
 async function convertirSuspendidas(){
   await cargarDatos(); // datos frescos antes de escribir
   const lista=suspendidasEnHoja();
@@ -1951,6 +2048,7 @@ function renderTabla(){
   const nPC=DB.filter(porCerrar).length, bPC=document.getElementById('btnPorCerrar');
   if(bPC){ bPC.style.display=nPC||fe==='__cierre'?'':'none'; bPC.textContent = fe==='__cierre' ? '✕ Ver todas' : `📝 Por cerrar (${nPC})`; }
   COLA_CIERRE = data.filter(porCerrar).map(r=>String(r.id));
+  actualizarBtnLote();
   const tbody=document.getElementById('tabla-body');
   const empty=document.getElementById('tabla-empty');
   if(!data.length){tbody.innerHTML='';empty.style.display='block';return}
